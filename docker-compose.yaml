@@ -1,0 +1,90 @@
+version: '3.8'
+
+# 
+# NightBFF Integration Testing Stack
+# See README.md for usage instructions.
+# 
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: nightbff_db_integration
+    ports:
+      - "5435:5432" # Expose on 5435 to avoid collision with local dev DB
+    volumes:
+      - postgres_data_integration:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - nightbff_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: nightbff_redis_integration
+    ports:
+      - "6380:6379" # Expose on 6380 to avoid collision
+    networks:
+      - nightbff_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./nightbff-backend # Path to the backend submodule
+      dockerfile: Dockerfile
+    container_name: nightbff_backend_integration
+    ports:
+      - "3001:3000" # Expose on 3001
+    env_file:
+      - ./.env.integration
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nightbff_net
+    # The image name will be parameterized in the CI/CD pipeline
+    # image: ghcr.io/your-org/nightbff-backend:int-latest
+
+  # Placeholder for the frontend service
+  # frontend:
+  #   build:
+  #     context: ./nightbff-ios-frontend
+  #   container_name: nightbff_frontend_integration
+  #   ports:
+  #     - "8081:8081"
+  #   networks:
+  #     - nightbff_net
+
+  cypress-runner:
+    image: cypress/included:13.6.1 # Use a version with bundled browser
+    container_name: nightbff_cypress_runner
+    depends_on:
+      - backend
+      # - frontend
+    environment:
+      - CYPRESS_BASE_URL=http://backend:3000/api
+    working_dir: /e2e
+    volumes:
+      - ./tests/e2e-cypress:/e2e
+    networks:
+      - nightbff_net
+
+networks:
+  nightbff_net:
+    driver: bridge
+
+volumes:
+  postgres_data_integration:
+    driver: local 

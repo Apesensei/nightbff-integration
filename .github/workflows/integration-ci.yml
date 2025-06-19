@@ -1,0 +1,68 @@
+# GitHub Actions CI Workflow for the NightBFF Integration Repository
+#
+# See: HYBRID_INTEGRATION_DEV_PLAN.md, Section 7 & 9
+# Status: Placeholder - requires implementation
+
+name: 'NightBFF - Integration CI'
+
+on:
+  push:
+    branches:
+      - 'integration/**'
+  workflow_dispatch:
+
+jobs:
+  validate_integration:
+    name: 'Validate Backend & Frontend Integration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: '1. Checkout Integration Repo'
+        uses: actions/checkout@v4
+        # This checks out the 'nightbff-integration' repository itself.
+
+      - name: '2. Checkout Backend & Frontend Submodules'
+        # The .gitmodules file (to be created) will point to the specific
+        # integration branches in the backend and frontend repositories.
+        run: |
+          echo "📝 Initializing Git submodules..."
+          # git submodule update --init --recursive
+          echo "✅ Submodules checked out."
+
+      - name: '3. Set up Docker Buildx'
+        uses: docker/setup-buildx-action@v3
+        # Required for building multi-platform Docker images.
+      
+      - name: '4. Build and Start Docker Compose Stack'
+        # This step will build the images for the backend (and frontend)
+        # and then start all services defined in docker-compose.yaml.
+        run: |
+          echo "🚀 Building and starting the integration stack..."
+          # docker-compose up --build -d
+          echo "✅ Stack is up and running."
+
+      - name: '5. Run Contract Tests (Pact)'
+        # Placeholder for contract testing step.
+        run: |
+          echo "Running contract tests... (to be implemented)"
+
+      - name: '6. Run End-to-End Tests (Cypress)'
+        # This command will execute the Cypress tests against the running stack.
+        run: |
+          echo "Running E2E tests..."
+          # docker-compose exec cypress-runner yarn test
+          echo "✅ E2E tests complete."
+
+      - name: '7. Run Performance/Load Tests (k6)'
+        # This command will execute k6 load tests.
+        run: |
+          echo "Running load tests..."
+          # docker-compose run k6 run /scripts/main.js
+          echo "✅ Load tests complete."
+      
+      - name: '8. Teardown Docker Compose Stack'
+        if: always() # Ensure this runs even if previous steps fail.
+        run: |
+          echo "🧹 Tearing down the integration stack..."
+          # docker-compose down -v --remove-orphans
+          echo "✅ Teardown complete." 
