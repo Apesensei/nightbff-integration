@@ -14,3 +14,4 @@ node_modules/
 /cypress/videos/
 /cypress/screenshots/
 junit-report.xml nightbff-frontend/
+nightbff-frontend
