@@ -3,20 +3,19 @@ version: '3.8'
 # 
 # NightBFF Integration Testing Stack
 # See README.md for usage instructions.
-# 
+# This stack uses pre-built images from GHCR.
+#
 
 services:
   db:
     image: postgis/postgis:15-3.3
     container_name: nightbff_db_integration
     ports:
-      - "5435:5432" # Expose on 5435 to avoid collision with local dev DB
+      - "5435:5432"
     volumes:
       - postgres_data_integration:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+    env_file:
+      - ./.env.integration
     networks:
       - nightbff_net
     healthcheck:
@@ -29,62 +28,38 @@ services:
     image: redis:7-alpine
     container_name: nightbff_redis_integration
     ports:
-      - "6380:6379" # Expose on 6380 to avoid collision
+      - "6379"
     networks:
       - nightbff_net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   backend:
-    build:
-      context: ./nightbff-backend # Path to the backend submodule
-      dockerfile: Dockerfile
+    image: ghcr.io/apesensei/nightbff-backend:int-f0053e4
     container_name: nightbff_backend_integration
     ports:
-      - "3001:3000" # Expose on 3001
+      - "3000:3000"
     env_file:
       - ./.env.integration
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
+        condition: service_started
     networks:
       - nightbff_net
-    # The image name will be parameterized in the CI/CD pipeline
-    # image: ghcr.io/your-org/nightbff-backend:int-latest
+    command: ["/bin/sh", "./scripts/wait-and-start.sh"]
 
-  # Placeholder for the frontend service
-  # frontend:
-  #   build:
-  #     context: ./nightbff-ios-frontend
-  #   container_name: nightbff_frontend_integration
-  #   ports:
-  #     - "8081:8081"
-  #   networks:
-  #     - nightbff_net
-
-  cypress-runner:
-    image: cypress/included:13.6.1 # Use a version with bundled browser
-    container_name: nightbff_cypress_runner
-    depends_on:
-      - backend
-      # - frontend
-    environment:
-      - CYPRESS_BASE_URL=http://backend:3000/api
-    working_dir: /e2e
-    volumes:
-      - ./tests/e2e-cypress:/e2e
+  frontend:
+    image: ghcr.io/apesensei/nightbff-frontend:int-a50f628
+    container_name: nightbff_frontend_integration
+    ports:
+      - "8081:8081" # Expose Metro bundler
     networks:
       - nightbff_net
+
+volumes:
+  postgres_data_integration:
+    driver: local
 
 networks:
   nightbff_net:
     driver: bridge
-
-volumes:
-  postgres_data_integration:
-    driver: local 
