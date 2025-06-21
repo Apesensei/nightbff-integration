@@ -13,4 +13,4 @@ node_modules/
 # Test Reports
 /cypress/videos/
 /cypress/screenshots/
-junit-report.xml 
+junit-report.xml nightbff-frontend/
