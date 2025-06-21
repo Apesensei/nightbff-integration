@@ -15,3 +15,5 @@ node_modules/
 /cypress/screenshots/
 junit-report.xml nightbff-frontend/
 nightbff-frontend
+
+nightbff-frontend/
