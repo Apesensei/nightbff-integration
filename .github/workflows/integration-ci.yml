@@ -98,7 +98,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app
-        run: npm ci --frozen-lockfile
+        run: npm ci
 
       - name: Run unit tests
         working-directory: ./app
@@ -136,7 +136,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./nightbff-frontend
-        run: npm ci --frozen-lockfile
+        run: npm ci
 
       - name: Run unit tests
         working-directory: ./nightbff-frontend
@@ -167,7 +167,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app
-        run: npm ci --frozen-lockfile
+        run: npm ci
 
       - name: Run contract tests
         working-directory: ./app
