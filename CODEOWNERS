@@ -1,0 +1,29 @@
+# NightBFF Integration Repository - Code Owners
+# 
+# This file defines the default reviewers for pull requests
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners for all files
+* @nightbff/devops @nightbff/platform-team
+
+# CI/CD workflows require DevOps approval
+.github/workflows/ @nightbff/devops
+
+# Docker configuration requires DevOps and Backend approval  
+docker-compose.yaml @nightbff/devops @nightbff/backend-team
+.env.integration @nightbff/devops @nightbff/backend-team
+
+# Test files require QA approval
+tests/ @nightbff/qa-team @nightbff/devops
+
+# Cypress tests require Frontend and QA approval
+tests/e2e-cypress/ @nightbff/frontend-team @nightbff/qa-team
+
+# k6 load tests require Backend and QA approval
+tests/load-k6/ @nightbff/backend-team @nightbff/qa-team
+
+# Documentation requires all teams
+*.md @nightbff/devops @nightbff/platform-team
+
+# Git submodule configuration requires Platform team approval
+.gitmodules @nightbff/platform-team @nightbff/devops 

@@ -1,0 +1,45 @@
+{
+  "name": "nightbff-integration",
+  "version": "1.0.0",
+  "description": "Integration testing repository for NightBFF platform",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:e2e",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "cypress open",
+    "test:load": "k6 run tests/load-k6/integration-smoke.js",
+    "test:all": "npm run test:e2e && npm run test:load",
+    "docker:up": "docker-compose up -d --wait",
+    "docker:down": "docker-compose down -v --remove-orphans",
+    "docker:logs": "docker-compose logs",
+    "health:check": "curl -f http://localhost:3000/health",
+    "setup": "git submodule update --init --recursive",
+    "clean": "rm -rf cypress/videos cypress/screenshots node_modules",
+    "ci:test": "npm run docker:up && npm run health:check && npm run test:all && npm run docker:down"
+  },
+  "keywords": [
+    "integration",
+    "testing",
+    "nightbff",
+    "cypress",
+    "k6",
+    "docker"
+  ],
+  "author": "NightBFF Platform Team",
+  "license": "MIT",
+  "devDependencies": {
+    "cypress": "^13.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Apesensei/nightbff-integration.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Apesensei/nightbff-integration/issues"
+  },
+  "homepage": "https://github.com/Apesensei/nightbff-integration#readme"
+} 
