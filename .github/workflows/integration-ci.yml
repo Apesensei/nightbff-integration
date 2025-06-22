@@ -112,7 +112,13 @@ jobs:
           SUPABASE_URL: http://localhost:54321
           SUPABASE_KEY: test-key
         run: |
-          npm run test -- --coverage --testPathIgnorePatterns "event-city-backfill\.job\.integration\.spec\.ts$" --passWithNoTests
+          npm run test -- --coverage \
+            --runInBand \
+            --detectOpenHandles \
+            --forceExit \
+            --bail=1 \
+            --testPathIgnorePatterns "event-city-backfill\\.job\\.integration\\.spec\\.ts$" \
+            --passWithNoTests
           npm run test:e2e -- --passWithNoTests
 
       - name: Upload coverage
