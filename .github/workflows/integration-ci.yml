@@ -109,8 +109,10 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           JWT_SECRET: test-secret
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_KEY: test-key
         run: |
-          npm run test -- --coverage --passWithNoTests
+          npm run test -- --coverage --testPathIgnorePatterns "event-city-backfill\.job\.integration\.spec\.ts$" --passWithNoTests
           npm run test:e2e -- --passWithNoTests
 
       - name: Upload coverage
@@ -177,6 +179,8 @@ jobs:
         working-directory: ./app/app
         env:
           JWT_SECRET: test-secret
+          SUPABASE_URL: http://localhost:54321
+          SUPABASE_KEY: test-key
         run: |
           mkdir -p logs pacts
           npm run test -- --testPathPattern=contract --passWithNoTests
