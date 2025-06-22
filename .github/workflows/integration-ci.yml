@@ -48,7 +48,7 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: |
-            app/package-lock.json
+            app/app/package-lock.json
             nightbff-frontend/package-lock.json
 
       - name: Generate cache keys
@@ -96,14 +96,14 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: app/package-lock.json
+          cache-dependency-path: app/app/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./app
+        working-directory: ./app/app
         run: npm ci
 
       - name: Run unit tests
-        working-directory: ./app
+        working-directory: ./app/app
         env:
           DATABASE_URL: postgresql://admin:testpass@localhost:5432/testdb
           REDIS_HOST: localhost
@@ -117,7 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: app/coverage/
+          path: app/app/coverage/
 
   unit_frontend:
     name: 'Unit Tests - Frontend'
@@ -167,14 +167,14 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: app/package-lock.json
+          cache-dependency-path: app/app/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./app
+        working-directory: ./app/app
         run: npm ci
 
       - name: Run contract tests
-        working-directory: ./app
+        working-directory: ./app/app
         env:
           JWT_SECRET: test-secret
         run: |
@@ -185,7 +185,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pact-files
-          path: app/pacts/
+          path: app/app/pacts/
 
   compose_up:
     name: 'Integration Stack - Docker Compose'
