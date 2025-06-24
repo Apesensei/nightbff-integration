@@ -243,6 +243,10 @@ jobs:
             --push \
             app/app
 
+      - name: ls frontend
+        run: |
+          ls -lR nightbff-frontend
+          
       - name: Build & push frontend image
         run: |
           docker buildx build \
