@@ -35,7 +35,7 @@ services:
   backend:
     image: ghcr.io/apesensei/nightbff-backend:int-f0053e4
     container_name: nightbff_backend_integration
-    command: ["sh", "-c", "echo 'Waiting for db:5432...' && while ! nc -z db 5432; do sleep 1; done && echo 'PostgreSQL started. Starting app...' && node dist/src/main.js"]
+    command: sh -c "echo 'Waiting for db:5432...' && while ! nc -z db 5432; do sleep 1; done && echo 'PostgreSQL started. Starting app...' && node dist/src/main.js > /tmp/backend.log 2>&1"
     ports:
       - "3000:3000"
     env_file:
