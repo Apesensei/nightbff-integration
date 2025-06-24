@@ -46,7 +46,6 @@ services:
         condition: service_started
     networks:
       - nightbff_net
-    command: ["/bin/sh", "./scripts/wait-and-start.sh"]
 
   frontend:
     image: ghcr.io/apesensei/nightbff-frontend:int-a50f628
