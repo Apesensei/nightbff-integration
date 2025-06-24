@@ -238,10 +238,10 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --file app/Dockerfile \
+            --file app/app/Dockerfile \
             --tag ghcr.io/apesensei/nightbff-backend:int-${{ steps.vars.outputs.backend_sha }} \
             --push \
-            app
+            app/app
 
       - name: Build & push frontend image
         run: |
