@@ -224,7 +224,7 @@ jobs:
       - name: Start integration stack
         run: |
           echo "🚀 Starting integration stack..."
-          docker-compose up -d --wait
+          docker compose up -d --wait
           echo "✅ Stack started successfully"
 
       - name: Wait for backend health
@@ -236,14 +236,14 @@ jobs:
       - name: Verify services
         run: |
           echo "🔍 Verifying all services are running..."
-          docker-compose ps
-          docker-compose logs --tail=20
+          docker compose ps
+          docker compose logs --tail=20
 
       - name: Export stack logs
         if: always()
         run: |
           mkdir -p logs
-          docker-compose logs > logs/compose-stack.log
+          docker compose logs > logs/compose-stack.log
 
       - name: Upload stack logs
         if: always()
@@ -272,7 +272,7 @@ jobs:
           sed -i "s|int-a50f628|int-${{ github.sha }}|g" docker-compose.yaml
 
       - name: Start integration stack
-        run: docker-compose up -d --wait
+        run: docker compose up -d --wait
 
       - name: Wait for backend health
         run: |
@@ -320,7 +320,7 @@ jobs:
 
       - name: Cleanup stack
         if: always()
-        run: docker-compose down -v --remove-orphans
+        run: docker compose down -v --remove-orphans
 
   k6_load:
     name: 'Load Tests - k6'
@@ -343,7 +343,7 @@ jobs:
           sed -i "s|int-a50f628|int-${{ github.sha }}|g" docker-compose.yaml
 
       - name: Start integration stack
-        run: docker-compose up -d --wait
+        run: docker compose up -d --wait
 
       - name: Wait for backend health
         run: |
@@ -408,7 +408,7 @@ jobs:
 
       - name: Cleanup stack
         if: always()
-        run: docker-compose down -v --remove-orphans
+        run: docker compose down -v --remove-orphans
 
   publish_reports:
     name: 'Publish Test Reports'
