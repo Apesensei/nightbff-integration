@@ -247,9 +247,10 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            --file nightbff-frontend/app/Dockerfile \
             --tag ghcr.io/apesensei/nightbff-frontend:int-${{ steps.vars.outputs.frontend_sha }} \
             --push \
-            nightbff-frontend
+            nightbff-frontend/app
 
       - name: Update docker-compose with dynamic tags
         run: |
