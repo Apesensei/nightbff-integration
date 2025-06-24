@@ -271,15 +271,17 @@ jobs:
 
       - name: Verify services
         run: |
-          echo "🔍 Verifying all services are running..."
-          docker compose ps
-          docker compose logs --tail=20
+          echo "Verifying service health..."
+          # Add checks here, e.g., curl backend endpoint
 
       - name: Export stack logs
         if: always()
         run: |
           mkdir -p logs
-          docker compose logs > logs/compose-stack.log
+          docker compose logs --no-color > logs/compose-logs.txt
+          docker compose logs backend > logs/backend-logs.txt
+          docker compose logs frontend > logs/frontend-logs.txt
+          docker compose logs db > logs/db-logs.txt
 
       - name: Upload stack logs
         if: always()
