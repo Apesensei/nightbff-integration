@@ -52,9 +52,11 @@ services:
     container_name: nightbff_frontend_integration
     ports:
       - "8081:8081" # Expose Metro bundler
-    command: ["npm", "start", "--", "--no-interactive", "--host", "lan"]
+    command: ["npm", "start", "--", "--host", "lan"]
     networks:
       - nightbff_net
+    environment:
+      - EXPO_NO_INTERACTIVE=1
 
 volumes:
   postgres_data_integration:
