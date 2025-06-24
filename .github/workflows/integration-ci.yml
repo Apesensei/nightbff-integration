@@ -56,6 +56,12 @@ jobs:
         run: |
           echo "node-cache-key=node-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}" >> $GITHUB_OUTPUT
 
+      - name: Compute image tags
+        id: vars
+        run: |
+          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
   unit_backend:
     name: 'Unit Tests - Backend'
     runs-on: ubuntu-latest
@@ -212,14 +218,19 @@ jobs:
           submodules: recursive
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
+      - name: Compute image tags
+        id: vars
+        run: |
+          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Update docker-compose with dynamic tags
         run: |
-          # Update image tags to use current commit SHA
-          sed -i "s|int-f0053e4|int-${{ github.sha }}|g" docker-compose.yaml
-          sed -i "s|int-a50f628|int-${{ github.sha }}|g" docker-compose.yaml
+          sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
+          sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
 
       - name: Start integration stack
         run: |
@@ -263,13 +274,19 @@ jobs:
           submodules: recursive
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
+      - name: Compute image tags
+        id: vars
+        run: |
+          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Update docker-compose with dynamic tags
         run: |
-          sed -i "s|int-f0053e4|int-${{ github.sha }}|g" docker-compose.yaml
-          sed -i "s|int-a50f628|int-${{ github.sha }}|g" docker-compose.yaml
+          sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
+          sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
 
       - name: Start integration stack
         run: docker compose up -d --wait
@@ -334,13 +351,19 @@ jobs:
           submodules: recursive
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
+      - name: Compute image tags
+        id: vars
+        run: |
+          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Update docker-compose with dynamic tags
         run: |
-          sed -i "s|int-f0053e4|int-${{ github.sha }}|g" docker-compose.yaml
-          sed -i "s|int-a50f628|int-${{ github.sha }}|g" docker-compose.yaml
+          sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
+          sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
 
       - name: Start integration stack
         run: docker compose up -d --wait
