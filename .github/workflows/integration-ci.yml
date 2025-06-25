@@ -266,7 +266,7 @@ jobs:
       - name: Wait for backend health
         run: |
           echo "⏳ Waiting for backend to be healthy..."
-          timeout 120 bash -c 'until curl -f http://localhost:3000/api/health; do sleep 2; done'
+          timeout 120 bash -c 'until curl -f http://localhost:3000/api/performance/metrics; do sleep 2; done'
           echo "✅ Backend is healthy"
 
       - name: Verify services
