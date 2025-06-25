@@ -199,9 +199,10 @@ jobs:
           SUPABASE_KEY: test-key
         run: |
           mkdir -p logs pacts
-          npm run test -- --testPathPattern=contract --passWithNoTests
+          npm run test -- --testPathPattern=contract
 
       - name: Upload pact files
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pact-files
@@ -257,6 +258,9 @@ jobs:
           sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
           sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
 
+      - name: Install E2E dependencies
+        run: npm ci
+
       - name: Start integration stack
         run: |
           echo "🚀 Starting integration stack..."
@@ -290,11 +294,7 @@ jobs:
           EOF
           fi
           
-          if command -v npx &> /dev/null; then
-            npx cypress run --spec "tests/e2e-cypress/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json" || echo "Cypress tests completed with issues"
-          else
-            echo "✅ Cypress tests skipped - no runner available"
-          fi
+          npx cypress run --spec "tests/e2e-cypress/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"
 
       - name: Run k6 load tests
         run: |
