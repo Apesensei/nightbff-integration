@@ -1,10 +1,11 @@
 {
   "name": "nightbff-integration-tests",
   "version": "1.0.0",
-  "description": "E2E and Load Tests for the NightBFF integration stack",
+  "description": "E2E and Integration tests for NightBFF",
   "main": "index.js",
   "scripts": {
-    "cypress:run": "cypress run"
+    "cy:run": "cypress run",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "cypress",
@@ -15,6 +16,6 @@
   "author": "NightBFF Platform Team",
   "license": "ISC",
   "devDependencies": {
-    "cypress": "^13.6.0"
+    "cypress": "^13.13.1"
   }
 } 
