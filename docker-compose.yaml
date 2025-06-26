@@ -38,7 +38,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["/bin/sh", "./scripts/run-migrations.sh"]
+    volumes:
+      - ./scripts:/usr/src/app/scripts
+    command: ["/bin/sh", "/usr/src/app/scripts/run-migrations.sh"]
     restart: 'no'
     environment:
       - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
