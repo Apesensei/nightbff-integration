@@ -4,6 +4,9 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# EXPORT the database URL to make it available to the TypeORM CLI
+export DATABASE_URL="postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public"
+
 # Wait for the database to be ready
 # Note: nc (netcat) might not be in the base node image, a small utility might need to be added to the Dockerfile if so.
 echo "Waiting for db:5432..."
