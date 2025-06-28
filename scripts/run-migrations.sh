@@ -22,7 +22,8 @@ echo "✅ PostgreSQL connection established"
 # Phase 3: Add migration validation step for governance enforcement
 echo ""
 echo "🔍 Step 1: Validating migration files (governance enforcement)..."
-npm run migration:validate
+# Use precompiled validator to avoid devDependency requirements in the production image 
+npm run migration:validate:compiled
 if [ $? -eq 0 ]; then
     echo "✅ Migration validation passed"
 else
