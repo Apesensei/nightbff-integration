@@ -19,7 +19,7 @@ services:
     networks:
       - nightbff_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d nightbff_integration_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,19 +32,29 @@ services:
     networks:
       - nightbff_net
 
+  migrator:
+    image: ghcr.io/apesensei/nightbff-backend:int-f0053e4 # Will be replaced by CI
+    container_name: nightbff_migrator_integration
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/usr/src/app/scripts
+    command: ["/bin/sh", "/usr/src/app/scripts/run-migrations.sh"]
+    restart: 'no'
+    environment:
+      - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
+
   backend:
-    image: ghcr.io/apesensei/nightbff-backend:int-f0053e4
+    image: ghcr.io/apesensei/nightbff-backend:int-f0053e4 # Will be replaced by CI
     container_name: nightbff_backend_integration
-    command: sh -c "echo 'Waiting for db:5432...' && while ! nc -z db 5432; do sleep 1; done && echo 'PostgreSQL started. Starting app...' && node dist/src/main.js > /tmp/backend.log 2>&1"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
     env_file:
       - ./.env.integration
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
     networks:
       - nightbff_net
 
@@ -66,3 +76,4 @@ volumes:
 networks:
   nightbff_net:
     driver: bridge
+ 
