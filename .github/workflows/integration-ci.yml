@@ -261,6 +261,14 @@ jobs:
       - name: Install E2E dependencies
         run: npm ci
 
+      - name: Validate migration files
+        run: |
+          echo "🔍 Validating migration files (governance enforcement)..."
+          cd app/app
+          npm ci
+          npm run migration:validate
+          echo "✅ Migration validation passed - deployment approved"
+
       - name: Start integration stack
         run: |
           echo "🚀 Starting integration stack..."

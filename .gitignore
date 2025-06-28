@@ -17,3 +17,7 @@ junit-report.xml nightbff-frontend/
 nightbff-frontend
 
 nightbff-frontend/
+
+# Migration governance - managed by backend submodule only
+app/app/src/database/migrations/
+app/app/scripts/run-migration.js
