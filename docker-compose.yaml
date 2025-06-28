@@ -38,9 +38,26 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - ./scripts:/usr/src/app/scripts
-    command: ["/bin/sh", "/usr/src/app/scripts/run-migrations.sh"]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo "✅ Migrator standing by. Waiting for DB..."
+        
+        # Robust wait loop
+        until pg_isready -h db -p 5432 -U admin; do
+          echo "Postgres is unavailable - sleeping"
+          sleep 2
+        done
+        
+        echo "✅ DB is ready. Running migration validation..."
+        npm run migration:validate:compiled
+        
+        echo "✅ Validation complete. Applying migrations..."
+        npm run migration:run
+        
+        echo "✅ Migrations applied successfully. Migrator finished."
     restart: 'no'
     environment:
       - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
