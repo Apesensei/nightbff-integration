@@ -45,8 +45,14 @@ services:
         set -e
         echo "✅ Migrator standing by. Waiting for DB..."
         
-        # Robust wait loop
-        until pg_isready -h db -p 5432 -U admin; do
+        # Node.js-based database connection test (no pg_isready needed)
+        until node -e "
+          const { Client } = require('pg');
+          const client = new Client('postgresql://admin:testpassword@db:5432/nightbff_integration_db');
+          client.connect()
+            .then(() => { console.log('DB ready'); client.end(); process.exit(0); })
+            .catch(() => { console.log('DB not ready'); client.end(); process.exit(1); });
+        " 2>/dev/null; do
           echo "Postgres is unavailable - sleeping"
           sleep 2
         done
