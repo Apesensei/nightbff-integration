@@ -47,25 +47,16 @@ services:
         set -e
         echo "✅ Migrator standing by. Waiting for DB..."
         
-        # Node.js-based database connection test (no pg_isready needed)
-        until node -e "
-          const net = require('net');
-          const socket = net.connect(5432, 'db');
-          socket.on('connect', () => { socket.end(); process.exit(0); });
-          socket.on('error', () => { process.exit(1); });
-          setTimeout(() => { socket.destroy(); process.exit(1); }, 1000);
-        " >/dev/null 2>&1; do
+        # Use pg_isready (installed in Docker image) for the most reliable DB check
+        until pg_isready -h db -p 5432 -U admin; do
           echo "Postgres is unavailable - sleeping"
           sleep 2
         done
         
         echo "✅ DB is ready. Applying migrations..."
-        npm run migration:run:compiled
+        npm run migration:run:compiled && npm run seed:smoke:compiled
         
-        echo "✅ Migrations applied. Seeding smoke data..."
-        npm run seed:smoke:compiled
-        
-        echo "✅ Smoke data seeded. Migrator finished."
+        echo "✅ Migrations and seeding complete. Migrator finished."
     restart: 'no'
     environment:
       - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
