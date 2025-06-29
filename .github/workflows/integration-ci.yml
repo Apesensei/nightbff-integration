@@ -350,6 +350,13 @@ jobs:
           docker compose logs frontend > logs/frontend-logs.txt
           docker compose logs db > logs/db-logs.txt
 
+      - name: Cleanup Docker state
+        if: always()
+        run: |
+          echo "🧹 Tearing down integration stack & pruning Docker resources..."
+          docker compose down -v || true
+          docker system prune -af || true
+
       - name: Upload logs & results
         if: always()
         uses: actions/upload-artifact@v4

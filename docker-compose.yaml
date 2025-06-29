@@ -59,13 +59,13 @@ services:
           sleep 2
         done
         
-        echo "✅ DB is ready. Running migration validation..."
-        npm run migration:validate:compiled
+        echo "✅ DB is ready. Applying migrations..."
+        npm run migration:run:compiled
         
-        echo "✅ Validation complete. Applying migrations..."
-        npm run migration:run
+        echo "✅ Migrations applied. Seeding smoke data..."
+        npm run seed:smoke:compiled
         
-        echo "✅ Migrations applied successfully. Migrator finished."
+        echo "✅ Smoke data seeded. Migrator finished."
     restart: 'no'
     environment:
       - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
