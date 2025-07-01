@@ -33,7 +33,9 @@ services:
       - nightbff_net
 
   migrator:
-    image: ghcr.io/apesensei/nightbff-backend:int-f0053e4 # Will be replaced by CI
+    build:
+      context: ./app/app
+      dockerfile: Dockerfile
     container_name: nightbff_migrator_integration
     depends_on:
       db:
@@ -62,7 +64,9 @@ services:
       - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
 
   backend:
-    image: ghcr.io/apesensei/nightbff-backend:int-f0053e4 # Will be replaced by CI
+    build:
+      context: ./app/app
+      dockerfile: Dockerfile
     container_name: nightbff_backend_integration
     depends_on:
       migrator:
