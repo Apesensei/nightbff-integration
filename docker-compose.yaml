@@ -15,7 +15,7 @@ services:
     volumes:
       - postgres_data_integration:/var/lib/postgresql/data
     env_file:
-      - ./.env.integration
+      - ../config/env/integration.env
     networks:
       - nightbff_net
     healthcheck:
@@ -74,7 +74,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - ./.env.integration
+      - ../config/env/integration.env
     networks:
       - nightbff_net
 
