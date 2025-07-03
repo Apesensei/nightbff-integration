@@ -108,6 +108,20 @@ jobs:
         working-directory: ./app/app
         run: npm ci
 
+      - name: Validate environment variables
+        working-directory: ./app/app
+        run: npm run env:lint
+
+      - name: Block deprecated DB_* variables
+        working-directory: ./app/app
+        run: |
+          echo "🔍 Checking for legacy DB_* variables…"
+          if grep -R --line-number -e '^DB_' ../../config/env ./app/app/.env.* 2>/dev/null; then
+            echo "❌ Deprecated DB_* variables found." && exit 1;
+          else
+            echo "✅ No legacy DB_* variables detected.";
+          fi
+
       - name: Run unit tests
         working-directory: ./app/app
         env:
@@ -136,6 +150,9 @@ jobs:
         with:
           name: backend-coverage
           path: app/app/coverage/
+
+      - name: Choose free Postgres port
+        run: bash scripts/ci/choose-pg-port.sh
 
   unit_frontend:
     name: 'Unit Tests - Frontend'
