@@ -56,7 +56,7 @@ services:
         done
         
         echo "✅ DB is ready. Applying migrations..."
-        npm run migration:run:compiled && npm run seed:smoke:compiled
+        npm run migration:run:compiled && node dist/scripts/run-seeder.js
         
         echo "✅ Migrations and seeding complete. Migrator finished."
     restart: 'no'
