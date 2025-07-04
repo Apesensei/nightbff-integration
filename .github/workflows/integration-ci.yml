@@ -111,11 +111,15 @@ jobs:
       - name: Validate environment variables
         working-directory: ./app/app
         env:
+          NODE_ENV: test
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
           POSTGRES_USER: admin
           POSTGRES_PASSWORD: testpass
           POSTGRES_DB: testdb
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: test-secret-for-validation
         run: npm run env:lint
 
       - name: Block deprecated DB_* variables
