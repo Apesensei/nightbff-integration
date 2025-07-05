@@ -108,6 +108,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app/app
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
         run: npm ci
 
       - name: Validate environment variables
@@ -220,6 +226,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app/app
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
         run: npm ci
 
       - name: Run contract tests
