@@ -39,7 +39,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -94,7 +95,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -172,7 +174,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -204,7 +207,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -243,7 +247,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Compute image tags
