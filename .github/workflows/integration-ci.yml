@@ -39,7 +39,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -94,7 +95,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -106,7 +108,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app/app
-        run: npm ci
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        run: npm ci --include=optional
+
+      - name: Verify platform binaries
+        working-directory: ./app/app
+        run: node scripts/verify-platform-binaries.js
 
       - name: Validate environment variables
         working-directory: ./app/app
@@ -172,7 +184,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -204,7 +217,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -216,7 +230,17 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app/app
-        run: npm ci
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        run: npm ci --include=optional
+
+      - name: Verify platform binaries
+        working-directory: ./app/app
+        run: node scripts/verify-platform-binaries.js
 
       - name: Run contract tests
         working-directory: ./app/app
@@ -243,7 +267,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Compute image tags
@@ -292,7 +317,7 @@ jobs:
         run: |
           echo "🔍 Validating migration files (governance enforcement)..."
           cd app/app
-          npm ci
+          npm ci --include=optional
           npm run migration:validate
           echo "✅ Migration validation passed - deployment approved"
 
