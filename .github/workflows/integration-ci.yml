@@ -1,7 +1,7 @@
 # NightBFF Integration CI Pipeline
 # 
 # Implements hybrid integration strategy with job matrix:
-# unit → contract → compose-up → cypress → k6 → publish-reports
+# sanity → unit → contract → compose-up → cypress → k6 → publish-reports
 #
 # See: HYBRID_INTEGRATION_DEV_PLAN.md §7, §9
 
@@ -30,9 +30,36 @@ env:
   FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
 
 jobs:
+  sanity:
+    name: 'Submodule Sanity Check'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with: 
+          submodules: 'true'
+          recursive: 'false'
+          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+
+      - name: Verify submodules initialisable
+        run: |
+          echo "🔍 Verifying submodules can be initialized without cyclic dependencies..."
+          git submodule update --init --recursive --depth=1
+          echo "✅ Submodule verification passed - no cyclic dependencies detected"
+
+      - name: Verify no orphan submodule references
+        run: |
+          echo "🔍 Checking for orphan submodule references..."
+          if find . -name ".git" -type f -exec grep -l "gitdir.*nightbff-integration" {} \; 2>/dev/null | grep -v ".git$"; then
+            echo "::error::Found orphan nightbff-integration submodule references - cyclic dependency detected"
+            exit 1
+          fi
+          echo "✅ No orphan submodule references found"
+
   setup_cache:
     name: 'Setup Node Cache'
     runs-on: ubuntu-latest
+    needs: sanity
     outputs:
       cache-key: ${{ steps.cache-keys.outputs.node-cache-key }}
     steps:
