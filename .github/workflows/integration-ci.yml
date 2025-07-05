@@ -114,7 +114,11 @@ jobs:
           POSTGRES_USER: admin
           POSTGRES_PASSWORD: testpass
           POSTGRES_DB: testdb
-        run: npm ci
+        run: npm ci --include=optional
+
+      - name: Verify platform binaries
+        working-directory: ./app/app
+        run: node scripts/verify-platform-binaries.js
 
       - name: Validate environment variables
         working-directory: ./app/app
@@ -232,7 +236,11 @@ jobs:
           POSTGRES_USER: admin
           POSTGRES_PASSWORD: testpass
           POSTGRES_DB: testdb
-        run: npm ci
+        run: npm ci --include=optional
+
+      - name: Verify platform binaries
+        working-directory: ./app/app
+        run: node scripts/verify-platform-binaries.js
 
       - name: Run contract tests
         working-directory: ./app/app
@@ -309,7 +317,7 @@ jobs:
         run: |
           echo "🔍 Validating migration files (governance enforcement)..."
           cd app/app
-          npm ci
+          npm ci --include=optional
           npm run migration:validate
           echo "✅ Migration validation passed - deployment approved"
 
