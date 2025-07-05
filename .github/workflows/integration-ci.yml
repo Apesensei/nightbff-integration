@@ -39,7 +39,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -94,7 +95,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -106,6 +108,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app/app
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
         run: npm ci
 
       - name: Validate environment variables
@@ -172,7 +180,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -204,7 +213,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -216,6 +226,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./app/app
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
         run: npm ci
 
       - name: Run contract tests
@@ -243,7 +259,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: 'true'
+          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Compute image tags
