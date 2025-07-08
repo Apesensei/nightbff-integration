@@ -84,10 +84,8 @@
     "enabled": true,
     "schedule": ["at any time"]
   },
-  "github": {
-    "assigneesSampleSize": 2,
-    "reviewersSampleSize": 1
-  },
+  "assigneesSampleSize": 2,
+  "reviewersSampleSize": 1,
   "prHourlyLimit": 3,
   "prConcurrentLimit": 5,
   "branchConcurrentLimit": 10,
