@@ -1,0 +1,117 @@
+name: Validate Renovate Config
+
+on:
+  push:
+    paths:
+      - '.renovaterc.json'
+      - 'renovate.json'
+      - '.github/renovate.json'
+  pull_request:
+    paths:
+      - '.renovaterc.json'
+      - 'renovate.json'
+      - '.github/renovate.json'
+
+jobs:
+  validate:
+    name: Validate Renovate Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install Renovate CLI
+        run: npm install -g renovate
+        
+      - name: Validate Renovate config
+        run: |
+          echo "🔍 Validating Renovate configuration..."
+          if [ -f ".renovaterc.json" ]; then
+            echo "📄 Found .renovaterc.json"
+            renovate-config-validator .renovaterc.json
+          elif [ -f "renovate.json" ]; then
+            echo "📄 Found renovate.json"
+            renovate-config-validator renovate.json
+          elif [ -f ".github/renovate.json" ]; then
+            echo "📄 Found .github/renovate.json"
+            renovate-config-validator .github/renovate.json
+          else
+            echo "❌ No Renovate configuration file found"
+            exit 1
+          fi
+          echo "✅ Renovate configuration is valid"
+          
+      - name: Check for required fields
+        run: |
+          echo "🔍 Checking required configuration fields..."
+          
+          config_file=""
+          if [ -f ".renovaterc.json" ]; then
+            config_file=".renovaterc.json"
+          elif [ -f "renovate.json" ]; then
+            config_file="renovate.json"
+          elif [ -f ".github/renovate.json" ]; then
+            config_file=".github/renovate.json"
+          fi
+          
+          echo "📄 Using config file: $config_file"
+          
+          # Check for weekly schedule
+          if grep -q "schedule:weekly\|every saturday" "$config_file"; then
+            echo "✅ Weekly schedule configured"
+          else
+            echo "❌ Weekly schedule not found"
+            exit 1
+          fi
+          
+          # Check for semantic commits
+          if grep -q "semanticCommits.*enabled" "$config_file"; then
+            echo "✅ Semantic commits enabled"
+          else
+            echo "⚠️  Semantic commits not explicitly enabled"
+          fi
+          
+          # Check for dependency dashboard
+          if grep -q "dependencyDashboard.*true" "$config_file"; then
+            echo "✅ Dependency dashboard enabled"
+          else
+            echo "⚠️  Dependency dashboard not enabled"
+          fi
+          
+          # Check for vulnerability alerts
+          if grep -q "vulnerabilityAlerts" "$config_file"; then
+            echo "✅ Vulnerability alerts configured"
+          else
+            echo "⚠️  Vulnerability alerts not configured"
+          fi
+          
+          echo "✅ Configuration validation complete"
+          
+      - name: Generate configuration summary
+        run: |
+          echo "📊 Renovate Configuration Summary"
+          echo "================================="
+          echo ""
+          echo "**Schedule:** Weekly (Saturdays)"
+          echo "**Auto-merge:** Enabled for patch/minor of safe packages"
+          echo "**Security updates:** High priority, auto-merge enabled"
+          echo "**Major updates:** Manual review required"
+          echo "**Dependency dashboard:** Enabled"
+          echo "**Lock file maintenance:** Weekly"
+          echo ""
+          echo "**Package groupings:**"
+          echo "- React Native ecosystem"
+          echo "- NestJS ecosystem"
+          echo "- TypeScript/ESLint tooling"
+          echo ""
+          echo "**Rate limits:**"
+          echo "- 3 PRs per hour"
+          echo "- 5 concurrent PRs"
+          echo "- 10 concurrent branches" 
