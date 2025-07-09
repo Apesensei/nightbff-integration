@@ -28,6 +28,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend
   FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
+  BACKEND_DIR: app
 
 jobs:
   sanity:
@@ -75,7 +76,7 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: |
-            app/app/package-lock.json
+            ${{ env.BACKEND_DIR }}/package-lock.json
             nightbff-frontend/package-lock.json
 
       - name: Generate cache keys
@@ -86,7 +87,7 @@ jobs:
       - name: Compute image tags
         id: vars
         run: |
-          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "backend_sha=$(git -C ${{ env.BACKEND_DIR }} rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
   unit_backend:
@@ -129,14 +130,14 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: app/app/package-lock.json
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./app/app
+        working-directory: ./${{ env.BACKEND_DIR }}
         run: npm ci
 
       - name: Validate environment variables
-        working-directory: ./app/app
+        working-directory: ./${{ env.BACKEND_DIR }}
         env:
           NODE_ENV: test
           POSTGRES_HOST: localhost
@@ -150,17 +151,17 @@ jobs:
         run: npm run env:lint
 
       - name: Block deprecated DB_* variables
-        working-directory: ./app/app
+        working-directory: ./${{ env.BACKEND_DIR }}
         run: |
           echo "🔍 Checking for legacy DB_* variables…"
-          if grep -R --line-number -e '^DB_' ../../config/env ./app/app/.env.* 2>/dev/null; then
+          if grep -R --line-number -e '^DB_' ../../config/env ./${{ env.BACKEND_DIR }}/.env.* 2>/dev/null; then
             echo "❌ Deprecated DB_* variables found." && exit 1;
           else
             echo "✅ No legacy DB_* variables detected.";
           fi
 
       - name: Run unit tests
-        working-directory: ./app/app
+        working-directory: ./${{ env.BACKEND_DIR }}
         env:
           DATABASE_URL: postgresql://admin:testpass@localhost:5432/testdb
           REDIS_HOST: localhost
@@ -186,7 +187,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: app/app/coverage/
+          path: ${{ env.BACKEND_DIR }}/coverage/
 
       - name: Choose free Postgres port
         run: bash scripts/ci/choose-pg-port.sh
@@ -239,15 +240,17 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: app/app/package-lock.json
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./app/app
+        working-directory: ./${{ env.BACKEND_DIR }}
         run: npm ci
 
       - name: Run contract tests
-        working-directory: ./app/app
+        working-directory: ./${{ env.BACKEND_DIR }}
         env:
+          PACT_BROKER_BASE_URL: ${{ secrets.PACT_BROKER_BASE_URL }}
+          PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
           JWT_SECRET: test-secret
           SUPABASE_URL: http://localhost:54321
           SUPABASE_KEY: test-key
@@ -260,7 +263,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pact-files
-          path: app/app/pacts/
+          path: ${{ env.BACKEND_DIR }}/pacts/
 
   integration_tests:
     name: 'Integration & E2E Tests'
@@ -276,7 +279,7 @@ jobs:
       - name: Compute image tags
         id: vars
         run: |
-          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "backend_sha=$(git -C ${{ env.BACKEND_DIR }} rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -293,10 +296,10 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --file app/app/Dockerfile \
+            --file ${{ env.BACKEND_DIR }}/Dockerfile \
             --tag ghcr.io/apesensei/nightbff-backend:int-${{ steps.vars.outputs.backend_sha }} \
             --push \
-            app/app
+            ${{ env.BACKEND_DIR }}
 
       - name: Build & push frontend image
         run: |
@@ -318,7 +321,7 @@ jobs:
       - name: Validate migration files
         run: |
           echo "🔍 Validating migration files (governance enforcement)..."
-          cd app/app
+          cd ${{ env.BACKEND_DIR }}
           npm ci
           npm run migration:validate
           echo "✅ Migration validation passed - deployment approved"
