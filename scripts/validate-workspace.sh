@@ -12,7 +12,7 @@ fi
 
 # Check workspace paths exist
 if ! grep -q '"backend/app"' package.json; then
-    echo "❌ Backend workspace not found in package.json"
+    echo "❌ Backend workspace (backend/app) not found in package.json"
     exit 1
 fi
 
