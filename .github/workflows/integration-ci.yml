@@ -147,9 +147,10 @@ jobs:
     services:
       postgres:
         image: postgis/postgis:15-3.3
-        env_file:
-          - ../config/env/base.env
-          - ../config/env/test.env
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: nightbff_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
