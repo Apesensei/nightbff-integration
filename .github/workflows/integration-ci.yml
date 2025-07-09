@@ -28,6 +28,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend
   FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
+  BACKEND_PATH: backend/app # Strategic Refactoring: Single source of truth for the backend path
 
 jobs:
   sanity:
@@ -121,7 +122,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: |
-            backend/app/package-lock.json
+            ${{ env.BACKEND_PATH }}/package-lock.json
             nightbff-frontend/package-lock.json
 
       - name: Generate cache keys
@@ -132,7 +133,7 @@ jobs:
       - name: Compute image tags
         id: vars
         run: |
-          echo "backend_sha=$(git -C app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "backend_sha=$(git -C ${{ env.BACKEND_PATH }} rev-parse --short HEAD)" >> $GITHUB_OUTPUT # Surgical Fix: Corrected path
           echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
   unit_backend:
@@ -175,14 +176,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: backend/app/package-lock.json
+          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./backend/app
+        working-directory: ./${{ env.BACKEND_PATH }}
         run: npm ci --include=optional
 
       - name: Validate environment variables
-        working-directory: ./backend/app
+        working-directory: ./${{ env.BACKEND_PATH }}
         env:
           NODE_ENV: test
           POSTGRES_HOST: localhost
@@ -196,17 +197,17 @@ jobs:
         run: npm run env:lint
 
       - name: Block deprecated DB_* variables
-        working-directory: ./backend/app
+        working-directory: ./${{ env.BACKEND_PATH }}
         run: |
           echo "🔍 Checking for legacy DB_* variables…"
-          if grep -R --line-number -e '^DB_' ../../config/env ./backend/app/.env.* 2>/dev/null; then
+          if grep -R --line-number -e '^DB_' ../../config/env ./${{ env.BACKEND_PATH }}/.env.* 2>/dev/null; then
             echo "❌ Deprecated DB_* variables found." && exit 1;
           else
             echo "✅ No legacy DB_* variables detected.";
           fi
 
       - name: Run unit tests
-        working-directory: ./backend/app
+        working-directory: ./${{ env.BACKEND_PATH }}
         env:
           DATABASE_URL: postgresql://admin:testpass@localhost:5432/testdb
           REDIS_HOST: localhost
@@ -232,7 +233,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: backend/app/coverage/
+          path: ${{ env.BACKEND_PATH }}/coverage/
 
       - name: Choose free Postgres port
         run: bash scripts/ci/choose-pg-port.sh
@@ -253,7 +254,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: nightbff-frontend/package-lock.json
+          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
 
       - name: Install dependencies
         working-directory: ./nightbff-frontend
@@ -285,14 +286,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: backend/app/package-lock.json
+          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./backend/app
+        working-directory: ./${{ env.BACKEND_PATH }}
         run: npm ci --include=optional
 
       - name: Run contract tests
-        working-directory: ./backend/app
+        working-directory: ./${{ env.BACKEND_PATH }}
         env:
           JWT_SECRET: test-secret
           SUPABASE_URL: http://localhost:54321
@@ -306,7 +307,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pact-files
-          path: backend/app/pacts/
+          path: ${{ env.BACKEND_PATH }}/pacts/
 
   integration_tests:
     name: 'Integration & E2E Tests'
@@ -322,7 +323,7 @@ jobs:
       - name: Compute image tags
         id: vars
         run: |
-          echo "backend_sha=$(git -C backend/app rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "backend_sha=$(git -C ${{ env.BACKEND_PATH }} rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
@@ -339,10 +340,10 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --file backend/app/Dockerfile \
+            --file ${{ env.BACKEND_PATH }}/Dockerfile \
             --tag ghcr.io/apesensei/nightbff-backend:int-${{ steps.vars.outputs.backend_sha }} \
             --push \
-            backend/app
+            ${{ env.BACKEND_PATH }}
 
       - name: Build & push frontend image
         run: |
@@ -364,7 +365,7 @@ jobs:
       - name: Validate migration files
         run: |
           echo "🔍 Validating migration files (governance enforcement)..."
-          cd backend/app
+          cd ${{ env.BACKEND_PATH }}
           npm ci --include=optional
           npm run migration:validate
           echo "✅ Migration validation passed - deployment approved"
@@ -407,7 +408,7 @@ jobs:
       - name: Generate k6 load test tokens
         run: |
           echo "🔐 Generating fresh JWT tokens for k6 load tests..."
-          cd backend/app
+          cd ${{ env.BACKEND_PATH }}
           
           # Ensure we have the required dependencies
           npm ci --include=optional
