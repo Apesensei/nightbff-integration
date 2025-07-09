@@ -183,12 +183,38 @@ jobs:
         run: |
           echo "🔧 Installing native build tools for sharp module compilation..."
           sudo apt-get update
-          sudo apt-get install -y build-essential gcc g++ make pkg-config libvips-dev
+          sudo apt-get install -y build-essential gcc g++ make pkg-config libvips-dev python3
           echo "✅ Native build tools installed successfully"
+
+      - name: Diagnose sharp environment
+        run: |
+          echo "🔍 Sharp diagnostic information..."
+          echo "Platform: $(node -pe 'process.platform + "-" + process.arch')"
+          echo "Node version: $(node --version)"
+          echo "Python available: $(python3 --version 2>/dev/null || echo 'NOT FOUND')"
+          echo "Environment variables:"
+          env | grep -i sharp || echo "No SHARP env vars"
+          npm config list | grep -i optional || echo "No optional config"
+          echo "libvips packages:"
+          dpkg -l | grep vips || echo "No vips packages found"
 
       - name: Install dependencies
         working-directory: ${{ github.workspace }}
         run: npm ci --legacy-peer-deps --include=optional
+
+      - name: Verify sharp installation
+        run: |
+          echo "🔍 Post-install sharp verification..."
+          echo "Sharp module location:"
+          find . -name "sharp" -type d | head -3
+          echo "Sharp binary locations:"
+          find . -name "*.node" -path "*/sharp/*" 2>/dev/null || echo "No .node files found"
+          echo "Sharp vendor directory:"
+          ls node_modules/sharp/vendor/ 2>/dev/null || echo "No vendor directory"
+          echo "Sharp build directory:"
+          ls node_modules/sharp/build/Release/ 2>/dev/null || echo "No build directory"
+          echo "Testing sharp module:"
+          node -e "try { require('sharp'); console.log('✅ Sharp loaded successfully'); } catch(e) { console.log('❌ Sharp failed:', e.message); }"
 
       - name: Validate environment variables
         working-directory: ./${{ env.BACKEND_PATH }}
