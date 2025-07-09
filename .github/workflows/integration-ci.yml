@@ -45,7 +45,7 @@ jobs:
       - name: Verify submodules initialisable
         run: |
           echo "🔍 Verifying submodules can be initialized without cyclic dependencies..."
-          git submodule update --init --recursive --depth=1
+          git submodule update --init --depth=1
           echo "✅ Submodule verification passed - no cyclic dependencies detected"
 
       - name: Verify no orphan submodule references
