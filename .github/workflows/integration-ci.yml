@@ -28,7 +28,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend
   FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
-  BACKEND_PATH: backend/app # Strategic Refactoring: Single source of truth for the backend path
+  BACKEND_PATH: backend/app # PATH FIX: backend submodule houses code under app/
 
 jobs:
   sanity:
@@ -140,13 +140,16 @@ jobs:
     name: 'Unit Tests - Backend'
     runs-on: ubuntu-latest
     needs: setup_cache
+    env:
+      NODE_ENV: test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
     services:
       postgres:
         image: postgis/postgis:15-3.3
-        env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+        env_file:
+          - ../config/env/base.env
+          - ../config/env/test.env
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -180,20 +183,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm ci --include=optional
+        run: npm ci --legacy-peer-deps --include=optional
 
       - name: Validate environment variables
         working-directory: ./${{ env.BACKEND_PATH }}
-        env:
-          NODE_ENV: test
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          JWT_SECRET: test-secret-for-validation
         run: npm run env:lint
 
       - name: Block deprecated DB_* variables
@@ -208,13 +201,6 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./${{ env.BACKEND_PATH }}
-        env:
-          DATABASE_URL: postgresql://admin:testpass@localhost:5432/testdb
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          JWT_SECRET: test-secret
-          SUPABASE_URL: http://localhost:54321
-          SUPABASE_KEY: test-key
         run: |
           npm run test -- --coverage \
             --runInBand \
@@ -254,11 +240,11 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
+          cache-dependency-path: nightbff-frontend/package-lock.json # EXPLICIT FIX: Isolate frontend cache
 
       - name: Install dependencies
         working-directory: ./nightbff-frontend
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Run unit tests
         working-directory: ./nightbff-frontend
@@ -274,6 +260,10 @@ jobs:
     name: 'Contract Tests - Backend'
     runs-on: ubuntu-latest
     needs: setup_cache
+    env: # MOVED TO JOB LEVEL
+      JWT_SECRET: test-secret
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_KEY: test-key
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -290,14 +280,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm ci --include=optional
+        run: npm ci --legacy-peer-deps --include=optional
 
       - name: Run contract tests
         working-directory: ./${{ env.BACKEND_PATH }}
-        env:
-          JWT_SECRET: test-secret
-          SUPABASE_URL: http://localhost:54321
-          SUPABASE_KEY: test-key
         run: |
           mkdir -p logs pacts
           npm run test -- --testPathPattern=contract
