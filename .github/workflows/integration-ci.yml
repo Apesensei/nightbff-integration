@@ -28,7 +28,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend
   FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
-  BACKEND_PATH: app/app # FINAL CORRECTION: The path is a nested app/app directory.
+  BACKEND_PATH: backend/app # PATH FIX: backend submodule houses code under app/
 
 jobs:
   sanity:

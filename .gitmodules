@@ -3,9 +3,6 @@
 	url = https://github.com/Apesensei/NightBFF-backend.git
 	branch = chore/seeder-unification
 [submodule "nightbff-frontend"]
-        path = nightbff-frontend
-        url = https://github.com/Apesensei/nightbf.git
-        branch = master
-[submodule "app"]
-	path = app
-	url = https://github.com/Apesensei/NightBFF-backend.git
+	path = nightbff-frontend
+	url = https://github.com/Apesensei/nightbff-frontend.git
+	branch = integration/250619-ios-sync
