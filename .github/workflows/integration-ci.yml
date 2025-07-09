@@ -144,21 +144,12 @@ jobs:
       NODE_ENV: test
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_USER: nightbff_user
-      POSTGRES_PASSWORD: your_strong_password
-      POSTGRES_DB: nightbff_dev
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      JWT_SECRET: F8xJoJmpizxnFYx+VtVz9a4KMv6F+eCeBwoFI4A6JQkKMAMh0+40y04U6/vDPJLQw/f9LqnmKjInodT+st3G9A==
-      DATABASE_URL: "postgresql://nightbff_user:your_strong_password@localhost:5432/nightbff_dev"
-      SUPABASE_URL: https://vlyvdscuvfurkmfehlvl.supabase.co
-      SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZseXZkc2N1dmZ1cmttZmVobHZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1NDc3MjksImV4cCI6MjA1OTEyMzcyOX0.aezRbzCytXoxix6YoaLBvzOTRBWVOvFq6pBgaNfA-4Y
     services:
       postgres:
         image: postgis/postgis:15-3.3
         env_file:
-          - ./config/env/base.env
-          - ./config/env/test.env
+          - ../config/env/base.env
+          - ../config/env/test.env
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
