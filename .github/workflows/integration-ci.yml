@@ -28,7 +28,7 @@ env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend
   FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
-  BACKEND_PATH: backend/app # Strategic Refactoring: Single source of truth for the backend path
+  BACKEND_PATH: app/app # FINAL CORRECTION: The path is a nested app/app directory.
 
 jobs:
   sanity:
@@ -254,7 +254,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
+          cache-dependency-path: nightbff-frontend/package-lock.json # EXPLICIT FIX: Isolate frontend cache
 
       - name: Install dependencies
         working-directory: ./nightbff-frontend
