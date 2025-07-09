@@ -140,13 +140,25 @@ jobs:
     name: 'Unit Tests - Backend'
     runs-on: ubuntu-latest
     needs: setup_cache
+    env: # MOVED TO JOB LEVEL
+      NODE_ENV: test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_SECRET: test-secret-for-validation
+      DATABASE_URL: postgresql://admin:testpass@localhost:5432/testdb # ADDED FOR TEST STEP
+      SUPABASE_URL: http://localhost:54321 # ADDED FOR TEST STEP
+      SUPABASE_KEY: test-key # ADDED FOR TEST STEP
     services:
       postgres:
         image: postgis/postgis:15-3.3
-        env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+        env_file:
+          - ./config/env/base.env
+          - ./config/env/test.env
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -184,16 +196,6 @@ jobs:
 
       - name: Validate environment variables
         working-directory: ./${{ env.BACKEND_PATH }}
-        env:
-          NODE_ENV: test
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          JWT_SECRET: test-secret-for-validation
         run: npm run env:lint
 
       - name: Block deprecated DB_* variables
@@ -208,13 +210,6 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./${{ env.BACKEND_PATH }}
-        env:
-          DATABASE_URL: postgresql://admin:testpass@localhost:5432/testdb
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          JWT_SECRET: test-secret
-          SUPABASE_URL: http://localhost:54321
-          SUPABASE_KEY: test-key
         run: |
           npm run test -- --coverage \
             --runInBand \
@@ -274,6 +269,10 @@ jobs:
     name: 'Contract Tests - Backend'
     runs-on: ubuntu-latest
     needs: setup_cache
+    env: # MOVED TO JOB LEVEL
+      JWT_SECRET: test-secret
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_KEY: test-key
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -294,10 +293,6 @@ jobs:
 
       - name: Run contract tests
         working-directory: ./${{ env.BACKEND_PATH }}
-        env:
-          JWT_SECRET: test-secret
-          SUPABASE_URL: http://localhost:54321
-          SUPABASE_KEY: test-key
         run: |
           mkdir -p logs pacts
           npm run test -- --testPathPattern=contract
