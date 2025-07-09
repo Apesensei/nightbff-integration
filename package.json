@@ -24,7 +24,7 @@
     "lint:frontend": "npm run lint --workspace=nightbff-frontend",
     "cy:run": "cypress run",
     "setup:hooks": "node scripts/setup-git-hooks.js",
-    "postinstall": "npm run setup:hooks",
+    "postinstall": "if [ \"$CI\" != \"true\" ]; then npm run setup:hooks; fi",
     "commitlint": "commitlint --from HEAD~1 --to HEAD --verbose",
     "commitlint:last": "commitlint --from HEAD~1 --to HEAD",
     "commitlint:edit": "commitlint --edit"

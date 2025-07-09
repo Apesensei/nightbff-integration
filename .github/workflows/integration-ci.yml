@@ -39,13 +39,12 @@ jobs:
         uses: actions/checkout@v4
         with: 
           submodules: 'true'
-          recursive: 'false'
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Verify submodules initialisable
         run: |
           echo "🔍 Verifying submodules can be initialized without cyclic dependencies..."
-          git submodule update --init --recursive --depth=1
+          git submodule update --init --depth=1
           echo "✅ Submodule verification passed - no cyclic dependencies detected"
 
       - name: Verify no orphan submodule references
@@ -113,7 +112,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -172,7 +171,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -233,7 +232,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -269,7 +268,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Setup Node.js
@@ -304,7 +303,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
           token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
 
       - name: Compute image tags
