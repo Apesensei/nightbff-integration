@@ -6,3 +6,6 @@
         path = nightbff-frontend
         url = https://github.com/Apesensei/nightbf.git
         branch = master
+[submodule "app"]
+	path = app
+	url = https://github.com/Apesensei/NightBFF-backend.git
