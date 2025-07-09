@@ -220,10 +220,8 @@ main() {
     # Verify Node version alignment (informational)
     verify_node_version || true
     
-    # Validate commit message if this is a commit (not amend)
-    if [ $exit_code -eq 0 ] && [ -f ".git/COMMIT_EDITMSG" ]; then
-        validate_commit_message ".git/COMMIT_EDITMSG" || exit_code=1
-    fi
+    # Note: Commit message validation is handled by commit-msg hook, not pre-commit
+    # Pre-commit hooks run before the commit message is written
     
     # Run lint-staged
     if [ $exit_code -eq 0 ]; then
