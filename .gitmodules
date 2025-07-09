@@ -1,7 +1,7 @@
 [submodule "backend"]
 	path = backend
 	url = https://github.com/Apesensei/NightBFF-backend.git
-	branch = chore/seeder-unification
+	branch = fix/ci-parent-cleanup
 [submodule "nightbff-frontend"]
 	path = nightbff-frontend
 	url = https://github.com/Apesensei/nightbff-frontend.git
