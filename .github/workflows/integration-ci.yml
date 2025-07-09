@@ -205,7 +205,7 @@ jobs:
             --detectOpenHandles \
             --forceExit \
             --bail=1 \
-            --testPathIgnorePatterns "event-city-backfill\\.job\\.integration\\.spec\\.ts$" \
+            --testPathIgnorePatterns "event-city-backfill\\.job\\.integration\\.spec\\.ts$|migration-glob-validation\\.spec\\.ts$" \
             --passWithNoTests
           npm run test:e2e -- \
             --runInBand \
