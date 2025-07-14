@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'  # Removed - obsolete in Docker Compose v2
 
 # 
 # NightBFF Integration Testing Stack
@@ -34,7 +34,7 @@ services:
 
   migrator:
     build:
-      context: ./app/app
+      context: ./backend/app
       dockerfile: Dockerfile
     container_name: nightbff_migrator_integration
     depends_on:
@@ -65,7 +65,7 @@ services:
 
   backend:
     build:
-      context: ./app/app
+      context: ./backend/app
       dockerfile: Dockerfile
     container_name: nightbff_backend_integration
     depends_on:
