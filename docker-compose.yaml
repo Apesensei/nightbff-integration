@@ -60,8 +60,6 @@ services:
         
         echo "✅ Migrations and seeding complete. Migrator finished."
     restart: 'no'
-    environment:
-      - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
     env_file:
       - backend/config/env/integration.env
 
@@ -81,20 +79,12 @@ services:
       - nightbff_net
 
   frontend:
-    image: ghcr.io/apesensei/nightbff-frontend:int-a50f628
+    build:
+      context: ./nightbff-frontend
+      dockerfile: Dockerfile
     container_name: nightbff_frontend_integration
     ports:
       - "8081:8081" # Expose Metro bundler
-    command:
-      - /bin/sh
-      - -c
-      - |
-        # Ensure compatible Ajv version is present to satisfy ajv-keywords
-        if ! node -e "require.resolve('ajv/dist/compile/codegen')" 2>/dev/null; then
-          echo "Ajv 8.x not found – installing locally (runtime fix)";
-          npm install --silent ajv@8.12.0 ajv-keywords@3.5.2;
-        fi
-        npm start -- --host lan
     networks:
       - nightbff_net
     environment:
