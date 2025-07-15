@@ -241,11 +241,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: nightbff-frontend/package-lock.json # EXPLICIT FIX: Isolate frontend cache
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./nightbff-frontend
-        run: npm ci --legacy-peer-deps
+        run: npm ci --workspace nightbff-frontend --legacy-peer-deps
 
       - name: Run unit tests
         working-directory: ./nightbff-frontend
