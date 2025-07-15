@@ -390,6 +390,20 @@ jobs:
           
           npx cypress run --spec "tests/e2e-cypress/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"
 
+      - name: Upload Cypress Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots/
+
+      - name: Upload Cypress Videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos
+          path: cypress/videos/
+
       - name: Generate k6 load test tokens
         run: |
           echo "🔐 Generating fresh JWT tokens for k6 load tests..."
