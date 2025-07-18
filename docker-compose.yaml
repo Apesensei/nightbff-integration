@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'  # Removed - obsolete in Docker Compose v2
 
 # 
 # NightBFF Integration Testing Stack
@@ -15,7 +15,7 @@ services:
     volumes:
       - postgres_data_integration:/var/lib/postgresql/data
     env_file:
-      - ../config/env/integration.env
+      - backend/config/env/integration.env
     networks:
       - nightbff_net
     healthcheck:
@@ -34,7 +34,7 @@ services:
 
   migrator:
     build:
-      context: ./app/app
+      context: ./backend/app
       dockerfile: Dockerfile
     container_name: nightbff_migrator_integration
     depends_on:
@@ -60,12 +60,12 @@ services:
         
         echo "✅ Migrations and seeding complete. Migrator finished."
     restart: 'no'
-    environment:
-      - DATABASE_URL=postgresql://admin:testpassword@db:5432/nightbff_integration_db?schema=public
+    env_file:
+      - backend/config/env/integration.env
 
   backend:
     build:
-      context: ./app/app
+      context: ./backend/app
       dockerfile: Dockerfile
     container_name: nightbff_backend_integration
     depends_on:
@@ -74,16 +74,17 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - ../config/env/integration.env
+      - backend/config/env/integration.env
     networks:
       - nightbff_net
 
   frontend:
-    image: ghcr.io/apesensei/nightbff-frontend:int-a50f628
+    build:
+      context: ./nightbff-frontend
+      dockerfile: Dockerfile
     container_name: nightbff_frontend_integration
     ports:
       - "8081:8081" # Expose Metro bundler
-    command: ["npm", "start", "--", "--host", "lan"]
     networks:
       - nightbff_net
     environment:

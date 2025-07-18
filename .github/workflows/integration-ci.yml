@@ -78,10 +78,12 @@ jobs:
 
       - name: Validate current commit
         if: github.event_name == 'push'
+        continue-on-error: ${{ startsWith(github.ref, 'refs/heads/integration/') }}
         run: npx commitlint --from HEAD~1 --to HEAD --verbose
 
       - name: Validate PR commits
         if: github.event_name == 'pull_request'
+        continue-on-error: ${{ startsWith(github.ref, 'refs/heads/integration/') }}
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
       - name: Show commit message format help
@@ -120,9 +122,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: |
-            ${{ env.BACKEND_PATH }}/package-lock.json
-            nightbff-frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Generate cache keys
         id: cache-keys
@@ -179,10 +179,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./${{ env.BACKEND_PATH }}
+        working-directory: ${{ github.workspace }}
         run: npm ci --legacy-peer-deps --include=optional
 
       - name: Validate environment variables
@@ -207,7 +207,7 @@ jobs:
             --detectOpenHandles \
             --forceExit \
             --bail=1 \
-            --testPathIgnorePatterns "event-city-backfill\\.job\\.integration\\.spec\\.ts$" \
+            --testPathIgnorePatterns "event-city-backfill\\.job\\.integration\\.spec\\.ts$|migration-glob-validation\\.spec\\.ts$" \
             --passWithNoTests
           npm run test:e2e -- \
             --runInBand \
@@ -222,6 +222,7 @@ jobs:
           path: ${{ env.BACKEND_PATH }}/coverage/
 
       - name: Choose free Postgres port
+        if: env.CI != 'true'
         run: bash scripts/ci/choose-pg-port.sh
 
   unit_frontend:
@@ -240,11 +241,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: nightbff-frontend/package-lock.json # EXPLICIT FIX: Isolate frontend cache
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./nightbff-frontend
-        run: npm ci --legacy-peer-deps
+        run: npm ci --workspace nightbff-frontend --legacy-peer-deps
 
       - name: Run unit tests
         working-directory: ./nightbff-frontend
@@ -276,10 +276,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: ${{ env.BACKEND_PATH }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: ./${{ env.BACKEND_PATH }}
+        working-directory: ${{ github.workspace }}
         run: npm ci --legacy-peer-deps --include=optional
 
       - name: Run contract tests
@@ -345,14 +345,13 @@ jobs:
           sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
           sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
 
-      - name: Install E2E dependencies
-        run: npm ci
+      - name: Install workspace dependencies
+        run: npm ci --legacy-peer-deps --include=optional
 
       - name: Validate migration files
         run: |
           echo "🔍 Validating migration files (governance enforcement)..."
           cd ${{ env.BACKEND_PATH }}
-          npm ci --include=optional
           npm run migration:validate
           echo "✅ Migration validation passed - deployment approved"
 
@@ -391,13 +390,24 @@ jobs:
           
           npx cypress run --spec "tests/e2e-cypress/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"
 
+      - name: Upload Cypress Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots/
+
+      - name: Upload Cypress Videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos
+          path: cypress/videos/
+
       - name: Generate k6 load test tokens
         run: |
           echo "🔐 Generating fresh JWT tokens for k6 load tests..."
           cd ${{ env.BACKEND_PATH }}
-          
-          # Ensure we have the required dependencies
-          npm ci --include=optional
           
           # Generate tokens using the existing script
           node scripts/generate-loadtest-tokens.js

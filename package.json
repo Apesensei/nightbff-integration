@@ -44,12 +44,12 @@
     "npm": ">=9.0.0"
   },
   "devDependencies": {
-    "cypress": "^13.13.1",
-    "concurrently": "^8.2.2",
-    "lint-staged": "^15.2.8",
-    "prettier": "^3.3.3",
     "@commitlint/cli": "^19.4.0",
-    "@commitlint/config-conventional": "^19.2.2"
+    "@commitlint/config-conventional": "^19.2.2",
+    "concurrently": "^8.2.2",
+    "cypress": "^13.13.1",
+    "lint-staged": "^15.2.8",
+    "prettier": "^3.3.3"
   },
   "lint-staged": {
     "*.{js,cy.js}": [

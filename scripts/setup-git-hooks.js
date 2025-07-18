@@ -128,6 +128,26 @@ function main() {
     return 0;
   }
 
+  // If `.git` is *not* a directory (e.g. we are executing inside a Git submodule
+  // where `.git` is a *file* pointing to the actual gitdir), attempting to
+  // create `.git/hooks` will throw ENOTDIR. The parent repository is already
+  // responsible for installing hooks, so we can safely exit early.
+
+  try {
+    const gitStat = fs.lstatSync(".git");
+    if (!gitStat.isDirectory()) {
+      log(
+        "yellow",
+        "⚠️  Detected submodule context (.git is a file). Skipping hook installation to avoid ENOTDIR.",
+      );
+      return 0;
+    }
+  } catch (e) {
+    // If .git doesn't exist for some reason, skip as well.
+    log("yellow", "⚠️  .git directory not found. Skipping hook installation.");
+    return 0;
+  }
+
   // Ensure .git/hooks directory exists
   ensureDirectoryExists(".git/hooks");
 
