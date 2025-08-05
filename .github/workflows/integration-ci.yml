@@ -185,6 +185,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: npm ci --legacy-peer-deps --include=optional
 
+      - name: Build backend
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: npm run build
+
       - name: Validate environment variables
         working-directory: ./${{ env.BACKEND_PATH }}
         run: npm run env:lint
@@ -281,6 +285,10 @@ jobs:
       - name: Install dependencies
         working-directory: ${{ github.workspace }}
         run: npm ci --legacy-peer-deps --include=optional
+
+      - name: Build backend
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: npm run build
 
       - name: Run contract tests
         working-directory: ./${{ env.BACKEND_PATH }}
