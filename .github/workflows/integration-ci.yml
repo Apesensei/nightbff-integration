@@ -185,6 +185,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: npm ci --legacy-peer-deps --include=optional
 
+      - name: Install Sharp platform-specific binaries
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: npm install sharp --platform=linux --arch=x64
+
       - name: Build backend
         working-directory: ./${{ env.BACKEND_PATH }}
         run: npm run build
