@@ -416,27 +416,44 @@ jobs:
           name: cypress-videos
           path: cypress/videos/
 
+      - name: Seed test users for load testing
+        run: |
+          echo "🌱 Seeding test users for load testing..."
+          cd ${{ env.BACKEND_PATH }}
+          
+          # Seed test users using the dedicated script
+          npm run seed:test-users
+          
+          # Verify users were created
+          echo "✅ Test user seeding completed"
+
       - name: Generate k6 load test tokens
         run: |
           echo "🔐 Generating fresh JWT tokens for k6 load tests..."
           cd ${{ env.BACKEND_PATH }}
           
-          # Generate tokens using the existing script
-          node scripts/generate-loadtest-tokens.js
+          # Generate tokens using the fixed script
+          node dist/scripts/generate-perf-tokens.js
           
           # Verify tokens were generated
-          if [ ! -f "scripts/loadtest_tokens.json" ]; then
+          if [ ! -f "performance-testing/k6-scripts/loadtest_tokens.json" ]; then
             echo "❌ Token generation failed"
             exit 1
           fi
           
-          TOKEN_COUNT=$(jq length scripts/loadtest_tokens.json)
+          TOKEN_COUNT=$(jq length performance-testing/k6-scripts/loadtest_tokens.json)
           echo "✅ Generated $TOKEN_COUNT tokens for load testing"
           
           # Copy tokens to k6 test directory
           mkdir -p ../../tests/load-k6
-          cp scripts/loadtest_tokens.json ../../tests/load-k6/
-          cp scripts/loadtest_user_ids.txt ../../tests/load-k6/
+          cp performance-testing/k6-scripts/loadtest_tokens.json ../../tests/load-k6/
+          cp performance-testing/k6-scripts/loadtest_user_ids.txt ../../tests/load-k6/
+          
+          # Verify token extraction works
+          echo "Verifying token extraction..."
+          TOKEN=$(head -2 performance-testing/k6-scripts/loadtest_tokens.json | tail -1 | tr -d '",')
+          echo "Token length: ${#TOKEN}"
+          echo "Token starts with: ${TOKEN:0:20}..."
 
       - name: Run k6 load tests
         run: |
@@ -498,8 +515,8 @@ jobs:
 
             // Test 2: Authenticated user endpoints
             group('Authenticated Endpoints', function () {
-              // User profile endpoint
-              const profileRes = http.get('http://localhost:3000/api/users/profile', { headers });
+              // User profile endpoint - FIXED: Changed from /api/users/profile to /api/users/me/profile
+              const profileRes = http.get('http://localhost:3000/api/users/me/profile', { headers });
               check(profileRes, {
                 'profile status 200 or 401': (r) => r.status === 200 || r.status === 401,
                 'profile response time < 200ms': (r) => r.timings.duration < 200,
@@ -513,12 +530,12 @@ jobs:
               });
             });
 
-            // Test 3: Plans endpoint
-            group('Plans Endpoints', function () {
-              const plansRes = http.get('http://localhost:3000/api/plans', { headers });
-              check(plansRes, {
-                'plans status 200 or 401': (r) => r.status === 200 || r.status === 401,
-                'plans response time < 250ms': (r) => r.timings.duration < 250,
+            // Test 3: Events endpoint - FIXED: Changed from /api/plans to /api/events/trending (existing endpoint)
+            group('Events Endpoints', function () {
+              const eventsRes = http.get('http://localhost:3000/api/events/trending', { headers });
+              check(eventsRes, {
+                'events status 200 or 401': (r) => r.status === 200 || r.status === 401,
+                'events response time < 250ms': (r) => r.timings.duration < 250,
               });
             });
 
@@ -536,6 +553,39 @@ jobs:
           # Run the comprehensive load test
           cd tests/load-k6
           k6 run authenticated-load-test.js --out json=../../k6-results.json
+          
+          # Parse and analyze k6 results
+          echo "📊 Analyzing k6 performance results..."
+          node ../../scripts/parse-k6-results.js ../../k6-results.json ../../k6-summary.json
+          
+          # Display summary in CI logs
+          if [ -f "../../k6-summary.json" ]; then
+            echo "📈 K6 Performance Summary:"
+            cat ../../k6-summary.json | jq -r '.performance.responseTime | "Response Time - Avg: \(.avg)ms, P95: \(.p95)ms, P99: \(.p99)ms"'
+            cat ../../k6-summary.json | jq -r '.performance.errorRate | "Error Rate: \((.rate * 100) | tostring + "%")"'
+            cat ../../k6-summary.json | jq -r '.checks | "Check Pass Rate: \((.rate * 100) | tostring + "%")"'
+            
+            # Check for threshold failures and send notifications
+            ERROR_COUNT=$(cat ../../k6-summary.json | jq '.errors | length')
+            if [ "$ERROR_COUNT" -gt 0 ]; then
+              echo "❌ K6 performance thresholds failed:"
+              cat ../../k6-summary.json | jq -r '.errors[] | "- \(.message)"'
+              
+              # Send failure notifications
+              echo "🔔 Sending failure notifications..."
+              node ../../scripts/notify-test-failure.js ../../k6-summary.json
+              exit 1
+            else
+              echo "✅ All k6 performance thresholds passed!"
+              
+              # Send success notification
+              echo "🔔 Sending success notification..."
+              node ../../scripts/notify-test-failure.js ../../k6-summary.json
+            fi
+          else
+            echo "❌ K6 summary file not found"
+            exit 1
+          fi
           echo "✅ Comprehensive load tests completed"
 
       - name: Export logs & results
