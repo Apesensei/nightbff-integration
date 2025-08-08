@@ -420,18 +420,21 @@ jobs:
         run: |
           echo "🌱 Seeding test users for load testing..."
           cd ${{ env.BACKEND_PATH }}
-          
-          # Seed test users using the dedicated script
-          npm run seed:test-users
-          
-          # Verify users were created
+          # Use the integration Docker Compose host mapping (5435) and integration credentials
+          export DATABASE_URL="postgresql://admin:testpassword@127.0.0.1:5435/nightbff_integration_db"
+          node dist/scripts/seed-test-users.js
           echo "✅ Test user seeding completed"
 
       - name: Generate k6 load test tokens
         run: |
           echo "🔐 Generating fresh JWT tokens for k6 load tests..."
           cd ${{ env.BACKEND_PATH }}
-          
+          # Load integration env (JWT_SECRET, DB creds) and construct host DSN for compose-mapped port
+          set -a
+          source ../config/env/integration.env
+          set +a
+          export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5435/${POSTGRES_DB}"
+          : "${JWT_SECRET:?Missing JWT_SECRET}"
           # Generate tokens using the fixed script
           node dist/scripts/generate-perf-tokens.js
           
