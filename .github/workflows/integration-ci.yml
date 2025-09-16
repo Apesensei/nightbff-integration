@@ -262,6 +262,48 @@ jobs:
           npm audit --audit-level=moderate
           echo "✅ Security audit completed"
 
+  jwt_security_validation:
+    name: 'JWT Security Validation'
+    runs-on: ubuntu-latest
+    needs: unit_backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: npm ci --legacy-peer-deps
+      
+      - name: Test app fails without JWT_SECRET
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: |
+          echo "🔍 Testing app fails without JWT_SECRET..."
+          unset JWT_SECRET
+          timeout 10s npm run start:dev || echo "✅ App correctly failed to start without JWT_SECRET"
+      
+      - name: Test app fails with short JWT_SECRET
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: |
+          echo "🔍 Testing app fails with short JWT_SECRET..."
+          export JWT_SECRET="short"
+          timeout 10s npm run start:dev || echo "✅ App correctly failed to start with short JWT_SECRET"
+      
+      - name: Test app starts with valid JWT_SECRET
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: |
+          echo "🔍 Testing app starts with valid JWT_SECRET..."
+          export JWT_SECRET="valid-32-character-secret-key-here"
+          timeout 10s npm run start:dev && echo "✅ App started successfully with valid JWT_SECRET"
+
   unit_frontend:
     name: 'Unit Tests - Frontend'
     runs-on: ubuntu-latest
@@ -339,7 +381,7 @@ jobs:
   integration_tests:
     name: 'Integration & E2E Tests'
     runs-on: ubuntu-latest
-    needs: [unit_backend, unit_frontend, contract_backend, security_audit]
+    needs: [unit_backend, unit_frontend, contract_backend, security_audit, jwt_security_validation]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
