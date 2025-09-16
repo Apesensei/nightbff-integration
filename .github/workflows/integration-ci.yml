@@ -259,7 +259,7 @@ jobs:
         working-directory: ./${{ env.BACKEND_PATH }}
         run: |
           echo "🔍 Running npm security audit..."
-          npm audit --audit-level=moderate
+          npm audit --audit-level=high
           echo "✅ Security audit completed"
 
   jwt_security_validation:
@@ -282,6 +282,9 @@ jobs:
       - name: Install dependencies
         working-directory: ./${{ env.BACKEND_PATH }}
         run: npm ci --legacy-peer-deps
+      - name: Install Sharp platform-specific binaries
+        working-directory: ./${{ env.BACKEND_PATH }}
+        run: npm install sharp --platform=linux --arch=x64
       
       - name: Test app fails without JWT_SECRET
         working-directory: ./${{ env.BACKEND_PATH }}
