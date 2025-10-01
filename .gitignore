@@ -13,10 +13,7 @@ node_modules/
 # Test Reports
 /cypress/videos/
 /cypress/screenshots/
-junit-report.xml nightbff-frontend/
-nightbff-frontend
-
-nightbff-frontend/
+junit-report.xml
 
 # Migration governance - managed by backend submodule only
 app/app/src/database/migrations/
