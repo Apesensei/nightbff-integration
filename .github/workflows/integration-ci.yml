@@ -56,6 +56,12 @@ jobs:
           fi
           echo "✅ No orphan submodule references found"
 
+      - name: Verify lockfile matches package.json
+        run: |
+          echo "🔍 Verifying package-lock.json consistency..."
+          npm ci --ignore-scripts
+          echo "✅ Lockfile verification passed - package.json and package-lock.json are synchronized"
+
   commitlint:
     name: 'Conventional Commits Validation'
     runs-on: ubuntu-latest
