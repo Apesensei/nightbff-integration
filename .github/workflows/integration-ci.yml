@@ -9,9 +9,9 @@ name: 'NightBFF Integration CI'
 
 on:
   push:
-    branches: ['integration/**']
+    branches: ['main', 'integration/**']
   pull_request:
-    branches: ['integration/**']
+    branches: ['main', 'integration/**']
   workflow_dispatch:
 
 concurrency:
