@@ -1,0 +1,119 @@
+# Frontend Docker Build for Integration CI
+# Location: nightbff-integration/Dockerfile.frontend
+# Context: nightbff-frontend/ submodule
+# Purpose: CI testing only (web builds), NOT for native mobile builds
+
+# Stage 1: Builder
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --legacy-peer-deps
+
+# Copy source code
+COPY . .
+
+# Temporarily rename map.tsx to avoid react-native-maps web build issues
+RUN mv app/\(tabs\)/map.tsx map.native.tsx.backup
+
+# Create web-compatible map.tsx using echo commands
+RUN echo 'import { useState, useRef, useEffect, useCallback, useMemo } from "react";' > app/\(tabs\)/map.tsx
+RUN echo 'import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Platform, TextInput, ScrollView, Pressable, Alert } from "react-native";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { ThemedView } from "../../components/ThemedView";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { ThemedText } from "../../components/ThemedText";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { useNearbyUsers } from "../../src/hooks/api/useHomeScreenData";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { UserLocation, MapRegion } from "../../src/types/data";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { BlurView } from "expo-blur";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { unstable_batchedUpdates } from "react-native";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { UserMarker } from "../../src/components/map/UserMarker";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { NearbyUserCard } from "../../src/components/map/NearbyUserCard";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { useNavigation } from "@react-navigation/native";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { useQuery } from "@tanstack/react-query";' >> app/\(tabs\)/map.tsx
+RUN echo 'import { useRouter } from "expo-router";' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '// Web-specific map screen - simplified version without react-native-maps' >> app/\(tabs\)/map.tsx
+RUN echo 'export default function MapScreen() {' >> app/\(tabs\)/map.tsx
+RUN echo '  const router = useRouter();' >> app/\(tabs\)/map.tsx
+RUN echo '  const [mapRegion, setMapRegion] = useState(null);' >> app/\(tabs\)/map.tsx
+RUN echo '  const [userLocation, setUserLocation] = useState(null);' >> app/\(tabs\)/map.tsx
+RUN echo '  const [errorMsg, setErrorMsg] = useState(null);' >> app/\(tabs\)/map.tsx
+RUN echo '  const [selectedUser, setSelectedUser] = useState(null);' >> app/\(tabs\)/map.tsx
+RUN echo '  const [isMapReady, setIsMapReady] = useState(false);' >> app/\(tabs\)/map.tsx
+RUN echo '  const [isFetchingLocation, setIsFetchingLocation] = useState(true);' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '  const DEFAULT_LOCATION = { latitude: 44.648764, longitude: -63.575239, latitudeDelta: 0.0922, longitudeDelta: 0.0421 };' >> app/\(tabs\)/map.tsx
+RUN echo '  const FREE_TIER = { MAX_USERS_DISPLAYED: 3, BLUR_AMOUNT: 30 };' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '  const { data: nearbyUsers = [], isLoading, error, refetch } = useNearbyUsers(mapRegion);' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '  useEffect(() => {' >> app/\(tabs\)/map.tsx
+RUN echo '    setUserLocation({ latitude: DEFAULT_LOCATION.latitude, longitude: DEFAULT_LOCATION.longitude });' >> app/\(tabs\)/map.tsx
+RUN echo '    setMapRegion(DEFAULT_LOCATION);' >> app/\(tabs\)/map.tsx
+RUN echo '    setIsFetchingLocation(false);' >> app/\(tabs\)/map.tsx
+RUN echo '    setIsMapReady(true);' >> app/\(tabs\)/map.tsx
+RUN echo '  }, []);' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '  const validUsers = useCallback(() => {' >> app/\(tabs\)/map.tsx
+RUN echo '    if (!nearbyUsers || !Array.isArray(nearbyUsers)) return [];' >> app/\(tabs\)/map.tsx
+RUN echo '    return nearbyUsers.filter(user => user && user.location && typeof user.location.latitude === "number" && typeof user.location.longitude === "number" && !isNaN(user.location.latitude) && !isNaN(user.location.longitude) && Math.abs(user.location.latitude) <= 90 && Math.abs(user.location.longitude) <= 180);' >> app/\(tabs\)/map.tsx
+RUN echo '  }, [nearbyUsers]);' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '  const limitedUsers = useCallback(() => validUsers().slice(0, FREE_TIER.MAX_USERS_DISPLAYED), [validUsers]);' >> app/\(tabs\)/map.tsx
+RUN echo '  const navigateToPaywall = useCallback(() => router.push("/paywall"), [router]);' >> app/\(tabs\)/map.tsx
+RUN echo '' >> app/\(tabs\)/map.tsx
+RUN echo '  return (' >> app/\(tabs\)/map.tsx
+RUN echo '    <ThemedView style={{flex: 1}}>' >> app/\(tabs\)/map.tsx
+RUN echo '      {errorMsg ? (' >> app/\(tabs\)/map.tsx
+RUN echo '        <View style={{flex: 1, justifyContent: "center", alignItems: "center", padding: 20}}>' >> app/\(tabs\)/map.tsx
+RUN echo '          <ThemedText style={{textAlign: "center", marginBottom: 20}}>{errorMsg}</ThemedText>' >> app/\(tabs\)/map.tsx
+RUN echo '          <TouchableOpacity style={{marginTop: 20, backgroundColor: "#4f94ef", paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20}} onPress={() => refetch()}>' >> app/\(tabs\)/map.tsx
+RUN echo '            <ThemedText style={{color: "white", fontWeight: "bold"}}>Retry</ThemedText>' >> app/\(tabs\)/map.tsx
+RUN echo '          </TouchableOpacity>' >> app/\(tabs\)/map.tsx
+RUN echo '        </View>' >> app/\(tabs\)/map.tsx
+RUN echo '      ) : (' >> app/\(tabs\)/map.tsx
+RUN echo '        <View style={{flex: 1, position: "relative"}}>' >> app/\(tabs\)/map.tsx
+RUN echo '          <View style={{flex: 1, position: "relative"}}>' >> app/\(tabs\)/map.tsx
+RUN echo '            <View style={{flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a"}}>' >> app/\(tabs\)/map.tsx
+RUN echo '              <ThemedText style={{fontSize: 24, fontWeight: "bold", color: "#a970ff", marginBottom: 10}}>Map View (Web Version)</ThemedText>' >> app/\(tabs\)/map.tsx
+RUN echo '              <ThemedText style={{fontSize: 16, color: "#666"}}>Interactive map available in mobile app</ThemedText>' >> app/\(tabs\)/map.tsx
+RUN echo '            </View>' >> app/\(tabs\)/map.tsx
+RUN echo '          </View>' >> app/\(tabs\)/map.tsx
+RUN echo '          <View style={{position: "absolute", top: 60, left: 0, right: 0, zIndex: 10, paddingHorizontal: 20}}>' >> app/\(tabs\)/map.tsx
+RUN echo '            <View style={{flexDirection: "row", alignItems: "center", backgroundColor: "white", borderRadius: 25, paddingHorizontal: 15, paddingVertical: 12, shadowColor: "#000", shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3}}>' >> app/\(tabs\)/map.tsx
+RUN echo '              <Ionicons name="search" size={20} color="#333" style={{marginRight: 10}} />' >> app/\(tabs\)/map.tsx
+RUN echo '              <TextInput style={{flex: 1, fontSize: 16, color: "#333"}} placeholder="Halifax, Canada" placeholderTextColor="#777" />' >> app/\(tabs\)/map.tsx
+RUN echo '            </View>' >> app/\(tabs\)/map.tsx
+RUN echo '          </View>' >> app/\(tabs\)/map.tsx
+RUN echo '          {isLoading && mapRegion && (' >> app/\(tabs\)/map.tsx
+RUN echo '            <View style={{position: "absolute", top: 120, alignSelf: "center", backgroundColor: "rgba(0,0,0,0.7)", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, flexDirection: "row", alignItems: "center"}}>' >> app/\(tabs\)/map.tsx
+RUN echo '              <ActivityIndicator size="small" color="#a970ff" />' >> app/\(tabs\)/map.tsx
+RUN echo '              <ThemedText style={{marginLeft: 10, fontSize: 14, fontWeight: "bold"}}>Finding people nearby...</ThemedText>' >> app/\(tabs\)/map.tsx
+RUN echo '            </View>' >> app/\(tabs\)/map.tsx
+RUN echo '          )}' >> app/\(tabs\)/map.tsx
+RUN echo '          <View style={{position: "absolute", top: 120, right: 20, backgroundColor: "rgba(169, 112, 255, 0.8)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15}}>' >> app/\(tabs\)/map.tsx
+RUN echo '            <ThemedText style={{fontSize: 12, fontWeight: "bold", color: "white"}}>Free Tier</ThemedText>' >> app/\(tabs\)/map.tsx
+RUN echo '          </View>' >> app/\(tabs\)/map.tsx
+RUN echo '        </View>' >> app/\(tabs\)/map.tsx
+RUN echo '      )}' >> app/\(tabs\)/map.tsx
+RUN echo '    </ThemedView>' >> app/\(tabs\)/map.tsx
+RUN echo '  );' >> app/\(tabs\)/map.tsx
+RUN echo '}' >> app/\(tabs\)/map.tsx
+
+# Build static web bundle (Expo SDK 54+ command)
+RUN npx expo export --platform web
+
+# Stage 2: Runtime
+FROM nginx:alpine
+
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Expose port
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
