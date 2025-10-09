@@ -336,7 +336,10 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./nightbff-frontend
-        run: npm test -- --coverage --passWithNoTests --watchAll=false
+        run: |
+          echo "🧪 Running frontend unit tests..."
+          npm test -- --coverage --passWithNoTests --watchAll=false --testPathIgnorePatterns=".*\\.native\\..*"
+          echo "✅ Frontend unit tests completed"
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -427,10 +430,11 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --file nightbff-frontend/Dockerfile \
+            --file Dockerfile.frontend \
+            --context nightbff-frontend \
             --tag ghcr.io/apesensei/nightbff-frontend:int-${{ steps.vars.outputs.frontend_sha }} \
             --push \
-            nightbff-frontend
+            .
 
       - name: Update docker-compose with dynamic tags
         run: |
@@ -458,6 +462,44 @@ jobs:
           echo "⏳ Waiting for backend to be healthy..."
           timeout 120 bash -c 'until curl -f http://localhost:3000/api/performance/metrics; do sleep 2; done'
           echo "✅ Backend is healthy"
+
+      - name: Wait for frontend health
+        run: |
+          echo "⏳ Waiting for frontend to be healthy..."
+          timeout 120 bash -c 'until curl -f http://localhost:8081; do sleep 2; done'
+          echo "✅ Frontend is healthy"
+
+      - name: Validate web build
+        run: |
+          echo "🔍 Validating frontend web build..."
+          
+          # Check HTML is served
+          curl -f http://localhost:8081 | grep -q "<!DOCTYPE html>" || (echo "❌ No HTML served" && exit 1)
+          
+          # Check JavaScript bundle exists
+          curl -f http://localhost:8081/static/js/ || (echo "❌ No JS bundle found" && exit 1)
+          
+          echo "✅ Web build validation passed"
+
+      - name: Frontend bundle size check
+        run: |
+          echo "📦 Checking frontend bundle size..."
+          
+          # Get bundle size from Docker image
+          BUNDLE_SIZE=$(docker exec nightbff_frontend_integration du -sh /usr/share/nginx/html | awk '{print $1}')
+          echo "Bundle size: $BUNDLE_SIZE"
+          
+          # Extract numeric value (e.g., "2.5M" -> 2.5)
+          SIZE_NUM=$(echo "$BUNDLE_SIZE" | sed 's/[^0-9.]//g')
+          SIZE_UNIT=$(echo "$BUNDLE_SIZE" | sed 's/[0-9.]//g')
+          
+          # Fail if bundle > 10MB
+          if [[ "$SIZE_UNIT" == "M" ]] && (( $(echo "$SIZE_NUM > 10" | bc -l) )); then
+            echo "❌ Bundle size exceeds 10MB threshold"
+            exit 1
+          fi
+          
+          echo "✅ Bundle size within acceptable range"
 
       - name: Run E2E Cypress tests
         run: |

@@ -81,14 +81,19 @@ services:
   frontend:
     build:
       context: ./nightbff-frontend
-      dockerfile: Dockerfile
+      dockerfile: ../Dockerfile.frontend  # Path relative to context
     container_name: nightbff_frontend_integration
     ports:
-      - "8081:8081" # Expose Metro bundler
+      - "8081:80"  # nginx serves on port 80
     networks:
       - nightbff_net
     environment:
-      - EXPO_NO_INTERACTIVE=1
+      - EXPO_PUBLIC_API_URL=http://backend:3000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data_integration:

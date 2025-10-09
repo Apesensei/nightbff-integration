@@ -45,7 +45,49 @@ If lock file becomes corrupted:
 3. Commit the regenerated `package-lock.json`
 4. Verify CI passes
 
+## Frontend Docker Build
+
+### 🐳 Docker Configuration
+
+The frontend uses a multi-stage Docker build:
+
+1. **Builder stage**: Installs dependencies and builds the web bundle
+2. **Nginx stage**: Serves the static files
+
+### 📁 File Structure
+
+```
+nightbff-integration/
+├── Dockerfile.frontend          # Frontend Docker build file
+├── .dockerignore.frontend       # Docker ignore patterns
+├── docker-compose.yaml          # Multi-service orchestration
+└── nightbff-frontend/          # Frontend submodule (source)
+```
+
+### 🔧 Build Commands
+
+```bash
+# Local build
+docker build -f Dockerfile.frontend -t nightbff-frontend:local nightbff-frontend/
+
+# CI build (uses buildx for multi-platform)
+docker buildx build --platform linux/amd64 --file Dockerfile.frontend --context nightbff-frontend --tag ghcr.io/apesensei/nightbff-frontend:int-${{ steps.vars.outputs.frontend_sha }} --push .
+```
+
+### 🧪 Testing Strategy
+
+- **Unit tests**: Run in CI with `--testPathIgnorePatterns=".*\\.native\\..*"`
+- **Web build validation**: Verify HTML and JS bundles are served
+- **Bundle size check**: Fail if bundle exceeds 10MB
+- **Health checks**: Verify frontend responds on port 8081
+
+### 🚨 Common Issues
+
+- **Native module imports**: Use platform-specific files (`.web.tsx`, `.native.tsx`)
+- **Bundle size**: Monitor and optimize dependencies
+- **Build failures**: Check for missing dependencies or syntax errors
+
 ---
 
 **Last Updated**: October 3, 2025  
-**Related**: PR #30 (lockfile synchronization fix)
+**Related**: PR #30 (lockfile synchronization fix), PR #33 (frontend Docker integration)

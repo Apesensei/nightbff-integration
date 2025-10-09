@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.expo/
+.git/
+coverage/
+*.test.tsx
+*.test.ts
+__tests__/
+*.log
+.DS_Store
+.env*
