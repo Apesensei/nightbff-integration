@@ -431,10 +431,9 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --file Dockerfile.frontend \
-            --context nightbff-frontend \
             --tag ghcr.io/apesensei/nightbff-frontend:int-${{ steps.vars.outputs.frontend_sha }} \
             --push \
-            .
+            nightbff-frontend/
 
       - name: Update docker-compose with dynamic tags
         run: |
@@ -493,8 +492,8 @@ jobs:
           SIZE_NUM=$(echo "$BUNDLE_SIZE" | sed 's/[^0-9.]//g')
           SIZE_UNIT=$(echo "$BUNDLE_SIZE" | sed 's/[0-9.]//g')
           
-          # Fail if bundle > 10MB
-          if [[ "$SIZE_UNIT" == "M" ]] && (( $(echo "$SIZE_NUM > 10" | bc -l) )); then
+          # Fail if bundle > 10MB (using awk instead of bc for better compatibility)
+          if [[ "$SIZE_UNIT" == "M" ]] && (( $(echo "$SIZE_NUM 10" | awk '{print ($1 > $2)}') )); then
             echo "❌ Bundle size exceeds 10MB threshold"
             exit 1
           fi
