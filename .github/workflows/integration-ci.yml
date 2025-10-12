@@ -435,11 +435,6 @@ jobs:
             --push \
             nightbff-frontend/
 
-      - name: Update docker-compose with dynamic tags
-        run: |
-          sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
-          sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
-
       - name: Install workspace dependencies
         run: npm ci --legacy-peer-deps --include=optional
 
@@ -451,8 +446,19 @@ jobs:
           echo "✅ Migration validation passed - deployment approved"
 
       - name: Start integration stack
+        env:
+          BACKEND_TAG: int-${{ steps.vars.outputs.backend_sha }}
+          FRONTEND_TAG: int-${{ steps.vars.outputs.frontend_sha }}
         run: |
           echo "🚀 Starting integration stack..."
+          echo "Backend image: ${{ env.BACKEND_IMAGE }}:int-${{ steps.vars.outputs.backend_sha }}"
+          echo "Frontend image: ${{ env.FRONTEND_IMAGE }}:int-${{ steps.vars.outputs.frontend_sha }}"
+          
+          # Temporarily rename override file to prevent local builds in CI
+          if [ -f docker-compose.override.yml ]; then
+            mv docker-compose.override.yml docker-compose.override.yml.disabled
+          fi
+          
           docker compose up -d --wait
           echo "✅ Stack started successfully"
 

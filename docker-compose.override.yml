@@ -1,0 +1,36 @@
+# docker-compose.override.yml
+#
+# Local Development Overrides
+# This file is automatically used by Docker Compose when running locally.
+# It overrides the base docker-compose.yaml to build from source instead of pulling images.
+#
+# Usage:
+#   docker compose up      # Automatically uses override file (builds from source)
+#   docker compose -f docker-compose.yaml up  # Skip override (uses pre-built images)
+#
+
+services:
+  migrator:
+    build:
+      context: ./backend/app
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64  # Force amd64 for consistency with CI
+    image: null  # Remove image reference, use build instead
+
+  backend:
+    build:
+      context: ./backend/app
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64  # Force amd64 for consistency with CI
+    image: null  # Remove image reference, use build instead
+
+  frontend:
+    build:
+      context: ./nightbff-frontend
+      dockerfile: ../Dockerfile.frontend
+      platforms:
+        - linux/amd64  # Force amd64 for consistency with CI
+    image: null  # Remove image reference, use build instead
+
