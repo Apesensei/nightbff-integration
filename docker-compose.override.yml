@@ -12,16 +12,16 @@
 services:
   migrator:
     build:
-      context: ./backend/app
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: app/Dockerfile
       platforms:
         - linux/amd64  # Force amd64 for consistency with CI
     image: null  # Remove image reference, use build instead
 
   backend:
     build:
-      context: ./backend/app
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: app/Dockerfile
       platforms:
         - linux/amd64  # Force amd64 for consistency with CI
     image: null  # Remove image reference, use build instead
