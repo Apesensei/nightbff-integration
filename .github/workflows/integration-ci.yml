@@ -459,8 +459,18 @@ jobs:
             mv docker-compose.override.yml docker-compose.override.yml.disabled
           fi
           
-          docker compose up -d --wait
-          echo "✅ Stack started successfully"
+          # Start services without waiting for healthchecks
+          # Let subsequent steps handle health verification for better error visibility
+          docker compose up -d
+          
+          # Show container status for debugging
+          docker compose ps
+          
+          # Show logs from backend startup for troubleshooting
+          echo "📋 Backend startup logs:"
+          docker compose logs backend --tail=50 || true
+          
+          echo "✅ Stack started (health checks in subsequent steps)"
 
       - name: Wait for backend health
         run: |
