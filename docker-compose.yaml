@@ -3,7 +3,15 @@
 # 
 # NightBFF Integration Testing Stack
 # See README.md for usage instructions.
-# This stack uses pre-built images from GHCR.
+#
+# This stack uses pre-built images from GHCR for CI/staging/prod.
+# For local development, use docker-compose.override.yml to build from source.
+#
+# Environment variables (set in CI or use defaults):
+# - BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend (default)
+# - FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend (default)
+# - BACKEND_TAG: int-<commit> (CI sets this)
+# - FRONTEND_TAG: int-<commit> (CI sets this)
 #
 
 services:
@@ -33,9 +41,7 @@ services:
       - nightbff_net
 
   migrator:
-    build:
-      context: ./backend/app
-      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-ghcr.io/apesensei/nightbff-backend}:${BACKEND_TAG:-latest}
     container_name: nightbff_migrator_integration
     depends_on:
       db:
@@ -64,9 +70,7 @@ services:
       - backend/config/env/integration.env
 
   backend:
-    build:
-      context: ./backend/app
-      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-ghcr.io/apesensei/nightbff-backend}:${BACKEND_TAG:-latest}
     container_name: nightbff_backend_integration
     depends_on:
       migrator:
@@ -77,11 +81,15 @@ services:
       - backend/config/env/integration.env
     networks:
       - nightbff_net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/performance/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
-    build:
-      context: ./nightbff-frontend
-      dockerfile: ../Dockerfile.frontend  # Path relative to context
+    image: ${FRONTEND_IMAGE:-ghcr.io/apesensei/nightbff-frontend}:${FRONTEND_TAG:-latest}
     container_name: nightbff_frontend_integration
     ports:
       - "8081:80"  # nginx serves on port 80
