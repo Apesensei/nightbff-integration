@@ -59,19 +59,21 @@ jobs:
       - name: Verify workspace lockfiles match package manifests
         run: |
           set -e
-          echo "🔍 Verifying backend lockfile consistency..."
+          echo "🔍 Verifying backend lockfile consistency (isolated prefix)..."
           if [ -f backend/app/package-lock.json ]; then
-            (cd backend/app && npm ci --ignore-scripts --include=optional)
+            env NPM_CONFIG_WORKSPACES=false npm ci --ignore-scripts --include=optional --prefix backend/app
           elif [ -f backend/app/package.json ]; then
-            (cd backend/app && npm install --package-lock-only && npm ci --ignore-scripts --include=optional)
+            env NPM_CONFIG_WORKSPACES=false npm install --package-lock-only --prefix backend/app
+            env NPM_CONFIG_WORKSPACES=false npm ci --ignore-scripts --include=optional --prefix backend/app
           else
             echo "::warning::backend/app missing package.json; skipping"
           fi
-          echo "🔍 Verifying frontend lockfile consistency..."
+          echo "🔍 Verifying frontend lockfile consistency (isolated prefix)..."
           if [ -f nightbff-frontend/package-lock.json ]; then
-            (cd nightbff-frontend && npm ci --ignore-scripts)
+            env NPM_CONFIG_WORKSPACES=false npm ci --ignore-scripts --prefix nightbff-frontend
           elif [ -f nightbff-frontend/package.json ]; then
-            (cd nightbff-frontend && npm install --package-lock-only && npm ci --ignore-scripts)
+            env NPM_CONFIG_WORKSPACES=false npm install --package-lock-only --prefix nightbff-frontend
+            env NPM_CONFIG_WORKSPACES=false npm ci --ignore-scripts --prefix nightbff-frontend
           else
             echo "::warning::nightbff-frontend missing package.json; skipping"
           fi
