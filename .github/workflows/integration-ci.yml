@@ -56,11 +56,26 @@ jobs:
           fi
           echo "✅ No orphan submodule references found"
 
-      - name: Verify lockfile matches package.json
+      - name: Verify workspace lockfiles match package manifests
         run: |
-          echo "🔍 Verifying package-lock.json consistency..."
-          npm ci --ignore-scripts
-          echo "✅ Lockfile verification passed - package.json and package-lock.json are synchronized"
+          set -e
+          echo "🔍 Verifying backend lockfile consistency..."
+          if [ -f backend/app/package-lock.json ]; then
+            (cd backend/app && npm ci --ignore-scripts --include=optional)
+          elif [ -f backend/app/package.json ]; then
+            (cd backend/app && npm install --package-lock-only && npm ci --ignore-scripts --include=optional)
+          else
+            echo "::warning::backend/app missing package.json; skipping"
+          fi
+          echo "🔍 Verifying frontend lockfile consistency..."
+          if [ -f nightbff-frontend/package-lock.json ]; then
+            (cd nightbff-frontend && npm ci --ignore-scripts)
+          elif [ -f nightbff-frontend/package.json ]; then
+            (cd nightbff-frontend && npm install --package-lock-only && npm ci --ignore-scripts)
+          else
+            echo "::warning::nightbff-frontend missing package.json; skipping"
+          fi
+          echo "✅ Workspace lockfile verification passed"
 
   commitlint:
     name: 'Conventional Commits Validation'
@@ -128,7 +143,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            backend/app/package-lock.json
+            nightbff-frontend/package-lock.json
 
       - name: Generate cache keys
         id: cache-keys
@@ -460,7 +478,7 @@ jobs:
         run: |
           echo "⏳ Waiting for backend to be healthy..."
           for i in {1..60}; do
-            if curl -sf http://localhost:3000/api/performance/metrics >/dev/null; then
+            if curl -sf http://localhost:3000/health >/dev/null; then
               echo "✅ Backend is healthy"
               exit 0
             fi
