@@ -1,8 +1,0 @@
-[submodule "backend"]
-	path = backend
-	url = https://github.com/Apesensei/NightBFF-backend.git
-	branch = main
-[submodule "nightbff-frontend"]
-	path = nightbff-frontend
-	url = https://github.com/Apesensei/nightbff-frontend.git
-	branch = master
