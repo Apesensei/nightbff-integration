@@ -1,0 +1,28 @@
+name: Orchestrate Publish & Integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main", "develop", "integration/**"]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  backend_publish:
+    uses: Apesensei/nightbff-backend/.github/workflows/build-publish-backend.yml@main
+    secrets: inherit
+
+  frontend_publish:
+    uses: Apesensei/nightbff-frontend/.github/workflows/build-publish-frontend.yml@main
+    secrets: inherit
+
+  integration_tests:
+    needs: [backend_publish, frontend_publish]
+    uses: ./.github/workflows/integration-ci.yml
+    with:
+      backend_digest: ${{ needs.backend_publish.outputs.digest }}
+      frontend_digest: ${{ needs.frontend_publish.outputs.digest }}
+    secrets: inherit
+

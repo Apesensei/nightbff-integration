@@ -1,838 +1,210 @@
-# NightBFF Integration CI Pipeline
-# 
-# Implements hybrid integration strategy with job matrix:
-# sanity → unit → contract → compose-up → cypress → k6 → publish-reports
-#
-# See: HYBRID_INTEGRATION_DEV_PLAN.md §7, §9
-
-name: 'NightBFF Integration CI'
+name: NightBFF Integration CI (Digest)
 
 on:
-  push:
-    branches: ['main', 'integration/**']
-  pull_request:
-    branches: ['main', 'integration/**']
+  workflow_call:
+    inputs:
+      backend_digest:
+        description: "Backend image digest (sha256:...)"
+        required: true
+        type: string
+      frontend_digest:
+        description: "Frontend image digest (sha256:...)"
+        required: true
+        type: string
+      backend_tag:
+        description: "Backend image tag (fallback, e.g., int-abc1234)"
+        required: false
+        type: string
+      frontend_tag:
+        description: "Frontend image tag (fallback, e.g., int-def5678)"
+        required: false
+        type: string
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.ref }}
-  cancel-in-progress: true
+    inputs:
+      backend_digest:
+        description: "Backend image digest (sha256:...)"
+        required: true
+        type: string
+      frontend_digest:
+        description: "Frontend image digest (sha256:...)"
+        required: true
+        type: string
+      backend_tag:
+        description: "Backend image tag (fallback, e.g., int-abc1234)"
+        required: false
+        type: string
+      frontend_tag:
+        description: "Frontend image tag (fallback, e.g., int-def5678)"
+        required: false
+        type: string
 
 permissions:
   contents: read
-  id-token: write
-  packages: write
-
-env:
-  NODE_ENV: integration
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend
-  FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend
-  BACKEND_PATH: backend/app # PATH FIX: backend submodule houses code under app/
+  packages: read
 
 jobs:
-  sanity:
-    name: 'Submodule Sanity Check'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with: 
-          submodules: 'true'
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Verify submodules initialisable
-        run: |
-          echo "🔍 Verifying submodules can be initialized without cyclic dependencies..."
-          git submodule update --init --depth=1
-          echo "✅ Submodule verification passed - no cyclic dependencies detected"
-
-      - name: Verify no orphan submodule references
-        run: |
-          echo "🔍 Checking for orphan submodule references..."
-          if find . -name ".git" -type f -exec grep -l "gitdir.*nightbff-integration" {} \; 2>/dev/null | grep -v ".git$"; then
-            echo "::error::Found orphan nightbff-integration submodule references - cyclic dependency detected"
-            exit 1
-          fi
-          echo "✅ No orphan submodule references found"
-
-      - name: Verify workspace lockfiles match package manifests
-        run: |
-          set -e
-          echo "🔍 Verifying backend lockfile consistency..."
-          if [ -f backend/app/package-lock.json ]; then
-            (cd backend/app && npm ci --ignore-scripts --include=optional)
-          elif [ -f backend/app/package.json ]; then
-            (cd backend/app && npm install --package-lock-only && npm ci --ignore-scripts --include=optional)
-          else
-            echo "::warning::backend/app missing package.json; skipping"
-          fi
-          echo "🔍 Verifying frontend lockfile consistency..."
-          if [ -f nightbff-frontend/package-lock.json ]; then
-            (cd nightbff-frontend && npm ci --ignore-scripts)
-          elif [ -f nightbff-frontend/package.json ]; then
-            (cd nightbff-frontend && npm install --package-lock-only && npm ci --ignore-scripts)
-          else
-            echo "::warning::nightbff-frontend missing package.json; skipping"
-          fi
-          echo "✅ Workspace lockfile verification passed"
-
-  commitlint:
-    name: 'Conventional Commits Validation'
-    runs-on: ubuntu-latest
-    needs: sanity
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install root dependencies (for commitlint)
-        run: npm install
-
-      - name: Validate current commit
-        if: github.event_name == 'push'
-        continue-on-error: ${{ startsWith(github.ref, 'refs/heads/integration/') }}
-        run: npx commitlint --from HEAD~1 --to HEAD --verbose
-
-      - name: Validate PR commits
-        if: github.event_name == 'pull_request'
-        continue-on-error: ${{ startsWith(github.ref, 'refs/heads/integration/') }}
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
-
-      - name: Show commit message format help
-        if: failure()
-        run: |
-          echo "❌ Commit message validation failed!"
-          echo ""
-          echo "✅ Valid examples:"
-          echo "  feat(auth): add user registration endpoint"
-          echo "  fix(ci): resolve docker build timeout"
-          echo "  docs(readme): update installation instructions"
-          echo "  chore(deps): bump typescript to 5.1.0"
-          echo ""
-          echo "📋 Required format: type(scope): description"
-          echo "📋 Valid types: feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert"
-          echo "📋 Max length: 72 characters"
-          echo "📋 Use lowercase for type and description"
-          echo ""
-          echo "📖 See: https://www.conventionalcommits.org/"
-
-  setup_cache:
-    name: 'Setup Node Cache'
-    runs-on: ubuntu-latest
-    needs: sanity
-    outputs:
-      cache-key: ${{ steps.cache-keys.outputs.node-cache-key }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            backend/app/package-lock.json
-            nightbff-frontend/package-lock.json
-
-      - name: Generate cache keys
-        id: cache-keys
-        run: |
-          echo "node-cache-key=node-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}" >> $GITHUB_OUTPUT
-
-      - name: Compute image tags
-        id: vars
-        run: |
-          echo "backend_sha=$(git -C ${{ env.BACKEND_PATH }} rev-parse --short HEAD)" >> $GITHUB_OUTPUT # Surgical Fix: Corrected path
-          echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-  unit_backend:
-    name: 'Unit Tests - Backend'
-    runs-on: ubuntu-latest
-    needs: setup_cache
-    env:
-      NODE_ENV: test
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
-    services:
-      postgres:
-        image: postgis/postgis:15-3.3
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: nightbff_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: ${{ github.workspace }}
-        run: npm ci --legacy-peer-deps --include=optional
-
-      - name: Install Sharp platform-specific binaries
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm install sharp --platform=linux --arch=x64
-
-      - name: Build backend
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm run build
-
-      - name: Validate environment variables
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm run env:lint
-
-      - name: Block deprecated DB_* variables
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          echo "🔍 Checking for legacy DB_* variables…"
-          if grep -R --line-number -e '^DB_' ../../config/env ./${{ env.BACKEND_PATH }}/.env.* 2>/dev/null; then
-            echo "❌ Deprecated DB_* variables found." && exit 1;
-          else
-            echo "✅ No legacy DB_* variables detected.";
-          fi
-
-      - name: Run unit tests
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          npm run test -- --coverage \
-            --runInBand \
-            --detectOpenHandles \
-            --forceExit \
-            --bail=1 \
-            --testPathIgnorePatterns "event-city-backfill\\.job\\.integration\\.spec\\.ts$|migration-glob-validation\\.spec\\.ts$" \
-            --passWithNoTests
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-coverage
-          path: ${{ env.BACKEND_PATH }}/coverage/
-
-      - name: Choose free Postgres port
-        if: env.CI != 'true'
-        run: bash scripts/ci/choose-pg-port.sh
-
-  security_audit:
-    name: 'Security Audit'
-    runs-on: ubuntu-latest
-    needs: unit_backend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-          
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-          
-      - name: Install dependencies
-        working-directory: ${{ github.workspace }}
-        run: npm ci --legacy-peer-deps --include=optional
-        
-      - name: Run security audit
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          echo "🔍 Running npm security audit..."
-          npm audit --audit-level=critical
-          echo "✅ Security audit completed"
-
-  jwt_security_validation:
-    name: 'JWT Security Validation'
-    runs-on: ubuntu-latest
-    needs: unit_backend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm ci --legacy-peer-deps
-      - name: Install Sharp platform-specific binaries
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm install sharp --platform=linux --arch=x64
-      
-      - name: Test JWT validation without JWT_SECRET
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          echo "🔍 Testing JWT validation without JWT_SECRET..."
-          unset JWT_SECRET
-          npm test -- --testNamePattern="JWT.*without.*JWT_SECRET" --verbose || echo "✅ JWT validation correctly failed without JWT_SECRET"
-      
-      - name: Test JWT validation with short JWT_SECRET
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          echo "🔍 Testing JWT validation with short JWT_SECRET..."
-          export JWT_SECRET="short"
-          npm test -- --testNamePattern="JWT.*short.*JWT_SECRET" --verbose || echo "✅ JWT validation correctly failed with short JWT_SECRET"
-      
-      - name: Test JWT validation with valid JWT_SECRET
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          echo "🔍 Testing JWT validation with valid JWT_SECRET..."
-          export JWT_SECRET="valid-32-character-secret-key-here"
-          npm test -- --testNamePattern="JWT.*valid.*JWT_SECRET" --verbose && echo "✅ JWT validation passed with valid JWT_SECRET"
-      
-      - name: Test environment schema validation
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          echo "🔍 Testing environment schema validation..."
-          npm test -- --testNamePattern="Environment.*Schema.*Validation" --verbose && echo "✅ Environment schema validation passed"
-  unit_frontend:
-    name: 'Unit Tests - Frontend'
-    runs-on: ubuntu-latest
-    needs: setup_cache
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        run: npm ci --workspace nightbff-frontend --legacy-peer-deps
-
-      - name: Run unit tests
-        working-directory: ./nightbff-frontend
-        run: |
-          echo "🧪 Running frontend unit tests..."
-          npm test -- --coverage --passWithNoTests --watchAll=false --testPathIgnorePatterns=".*\\.native\\..*"
-          echo "✅ Frontend unit tests completed"
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-coverage
-          path: nightbff-frontend/coverage/
-
-  contract_backend:
-    name: 'Contract Tests - Backend'
-    runs-on: ubuntu-latest
-    needs: setup_cache
-    env: # MOVED TO JOB LEVEL
-      JWT_SECRET: test-secret
-      SUPABASE_URL: http://localhost:54321
-      SUPABASE_KEY: test-key
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        working-directory: ${{ github.workspace }}
-        run: npm ci --legacy-peer-deps --include=optional
-
-      - name: Build backend
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: npm run build
-
-      - name: Run contract tests
-        working-directory: ./${{ env.BACKEND_PATH }}
-        run: |
-          mkdir -p logs pacts
-          npm run test -- --testPathPattern=contract
-
-      - name: Upload pact files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pact-files
-          path: ${{ env.BACKEND_PATH }}/pacts/
-
   integration_tests:
-    name: 'Integration & E2E Tests'
     runs-on: ubuntu-latest
-    needs: [unit_backend, unit_frontend, contract_backend, security_audit, jwt_security_validation]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.ACCESS_TOKEN_GITHUB }}
-
-      - name: Compute image tags
-        id: vars
-        run: |
-          echo "backend_sha=$(git -C ${{ env.BACKEND_PATH }} rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "frontend_sha=$(git -C nightbff-frontend rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push backend image
+      - name: Compute image refs (digest preferred, tag fallback)
+        id: refs
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file ${{ env.BACKEND_PATH }}/Dockerfile \
-            --tag ghcr.io/apesensei/nightbff-backend:int-${{ steps.vars.outputs.backend_sha }} \
-            --push \
-            ${{ env.BACKEND_PATH }}
+          BACKEND=ghcr.io/apesensei/nightbff-backend
+          FRONTEND=ghcr.io/apesensei/nightbff-frontend-web
+          if [ -n "${{ inputs.backend_digest }}" ]; then
+            echo "backend_ref=${BACKEND}@${{ inputs.backend_digest }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.backend_tag }}" ]; then
+            echo "backend_ref=${BACKEND}:${{ inputs.backend_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::backend_digest or backend_tag is required"; exit 1;
+          fi
+          if [ -n "${{ inputs.frontend_digest }}" ]; then
+            echo "frontend_ref=${FRONTEND}@${{ inputs.frontend_digest }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.frontend_tag }}" ]; then
+            echo "frontend_ref=${FRONTEND}:${{ inputs.frontend_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::frontend_digest or frontend_tag is required"; exit 1;
+          fi
 
-      - name: Build & push frontend image
+      - name: Validate env contract (env:lint in backend container)
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file Dockerfile.frontend \
-            --tag ghcr.io/apesensei/nightbff-frontend:int-${{ steps.vars.outputs.frontend_sha }} \
-            --push \
-            nightbff-frontend/
+          BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          docker run --rm --env-file ./config/integration.env "${BACKEND_REF}" npm run env:lint
 
-      - name: Update docker-compose with dynamic tags
+      - name: Generate compose.override.yml
         run: |
-          sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
-          sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
+          cat > compose.override.yml <<'EOC'
+          services:
+            migrator:
+              image: ${{ steps.refs.outputs.backend_ref }}
+              depends_on:
+                db:
+                  condition: service_healthy
+              env_file:
+                - ./config/integration.env
+              command: ["sh", "-lc", "npm run migration:run:compiled && node dist/scripts/run-seeder.js"]
+              restart: "no"
+            backend:
+              image: ${{ steps.refs.outputs.backend_ref }}
+              env_file: [ ./config/integration.env ]
+              ports: [ "3000:3000" ]
+              healthcheck:
+                test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { r.on('data', () => {}); r.on('end', () => { process.exit(r.statusCode === 200 ? 0 : 1); }); }).on('error', () => process.exit(1));"]
+                interval: 10s
+                timeout: 5s
+                retries: 12
+                start_period: 30s
+              depends_on:
+                migrator:
+                  condition: service_completed_successfully
+            frontend:
+              image: ${{ steps.refs.outputs.frontend_ref }}
+              ports: [ "8081:80" ]
+          EOC
 
-      - name: Install workspace dependencies
-        run: npm ci --legacy-peer-deps --include=optional
-
-      - name: Validate migration files
-        run: |
-          echo "🔍 Validating migration files (governance enforcement)..."
-          cd ${{ env.BACKEND_PATH }}
-          npm run migration:validate
-          echo "✅ Migration validation passed - deployment approved"
-
-      - name: Start integration stack
-        run: |
-          echo "🚀 Starting integration stack..."
-          docker compose up -d --wait
-          echo "✅ Stack started successfully"
+      - name: Start infra and services
+        env:
+          COMPOSE_PROJECT_NAME: nightbff_int_${{ github.run_id }}
+        run: docker compose up -d --wait
 
       - name: Wait for backend health
-        run: |
-          echo "⏳ Waiting for backend to be healthy..."
-          for i in {1..60}; do
-            if curl -sf http://localhost:3000/health >/dev/null; then
-              echo "✅ Backend is healthy"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "❌ Backend did not become healthy in time" >&2
-          echo "----- docker ps -----"
-          docker ps -a || true
-          echo "----- backend logs -----"
-          docker compose logs backend || true
-          echo "----- full compose logs -----"
-          docker compose logs || true
-          exit 1
+        run: timeout 120 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
 
       - name: Wait for frontend health
+        run: timeout 120 bash -c 'until curl -f http://localhost:8081; do sleep 2; done'
+
+      - name: Validate basic endpoints
         run: |
-          echo "⏳ Waiting for frontend to be healthy..."
-          timeout 120 bash -c 'until curl -f http://localhost:8081; do sleep 2; done'
-          echo "✅ Frontend is healthy"
+          curl -f http://localhost:3000/api/performance/metrics
+          curl -f http://localhost:3000/api/docs
 
-      - name: Validate web build
+      - name: Generate loadtest tokens (in backend container)
         run: |
-          echo "🔍 Validating frontend web build..."
-          
-          # Check HTML is served
-          curl -f http://localhost:8081 | grep -q "<!DOCTYPE html>" || (echo "❌ No HTML served" && exit 1)
-          
-          # Check JavaScript bundle exists
-          curl -f http://localhost:8081/static/js/ || (echo "❌ No JS bundle found" && exit 1)
-          
-          echo "✅ Web build validation passed"
-
-      - name: Frontend bundle size check
-        run: |
-          echo "📦 Checking frontend bundle size..."
-          
-          # Get bundle size from Docker image
-          BUNDLE_SIZE=$(docker exec nightbff_frontend_integration du -sh /usr/share/nginx/html | awk '{print $1}')
-          echo "Bundle size: $BUNDLE_SIZE"
-          
-          # Extract numeric value (e.g., "2.5M" -> 2.5)
-          SIZE_NUM=$(echo "$BUNDLE_SIZE" | sed 's/[^0-9.]//g')
-          SIZE_UNIT=$(echo "$BUNDLE_SIZE" | sed 's/[0-9.]//g')
-          
-          # Fail if bundle > 10MB (using awk instead of bc for better compatibility)
-          if [[ "$SIZE_UNIT" == "M" ]] && (( $(echo "$SIZE_NUM 10" | awk '{print ($1 > $2)}') )); then
-            echo "❌ Bundle size exceeds 10MB threshold"
-            exit 1
-          fi
-          
-          echo "✅ Bundle size within acceptable range"
-
-      - name: Run E2E Cypress tests
-        run: |
-          echo "🧪 Running E2E tests..."
-          if [ ! -f "tests/e2e-cypress/smoke.cy.js" ]; then
-            mkdir -p tests/e2e-cypress
-            cat > tests/e2e-cypress/smoke.cy.js << 'EOF'
-          describe('NightBFF Integration Smoke Tests', () => {
-            it('should have backend performance metrics endpoint responding', () => {
-              cy.request('GET', 'http://localhost:3000/api/performance/metrics').then((response) => {
-                expect(response.status).to.eq(200);
-              });
-            });
-            it('should have swagger docs available', () => {
-              cy.request('GET', 'http://localhost:3000/api/docs').then((response) => {
-                expect(response.status).to.eq(200);
-              });
-            });
-          });
-          EOF
-          fi
-          
-          npx cypress run --spec "tests/e2e-cypress/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"
-
-      - name: Upload Cypress Screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-screenshots
-          path: cypress/screenshots/
-
-      - name: Upload Cypress Videos
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-videos
-          path: cypress/videos/
-
-      - name: Seed test users for load testing
-        run: |
-          echo "🌱 Seeding test users for load testing..."
-          cd ${{ env.BACKEND_PATH }}
-          # Use the integration Docker Compose host mapping (5435) and integration credentials
-          export DATABASE_URL="postgresql://admin:testpassword@127.0.0.1:5435/nightbff_integration_db"
-          node dist/scripts/seed-test-users.js
-          echo "✅ Test user seeding completed"
-
-      - name: Generate k6 load test tokens
-        run: |
-          echo "🔐 Generating fresh JWT tokens for k6 load tests..."
-          cd ${{ env.BACKEND_PATH }}
-          # Load integration env (JWT_SECRET, DB creds) and construct host DSN for compose-mapped port
-          set -a
-          source ../config/env/integration.env
-          set +a
-          export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5435/${POSTGRES_DB}"
-          : "${JWT_SECRET:?Missing JWT_SECRET}"
-          # Generate tokens using the fixed script
-          node dist/scripts/generate-perf-tokens.js
-          
-          # Verify tokens were generated
-          if [ ! -f "performance-testing/k6-scripts/loadtest_tokens.json" ]; then
-            echo "❌ Token generation failed"
-            exit 1
-          fi
-          
-          TOKEN_COUNT=$(jq length performance-testing/k6-scripts/loadtest_tokens.json)
-          echo "✅ Generated $TOKEN_COUNT tokens for load testing"
-          
-          # Copy tokens to k6 test directory
-          mkdir -p ../../tests/load-k6
-          cp performance-testing/k6-scripts/loadtest_tokens.json ../../tests/load-k6/
-          cp performance-testing/k6-scripts/loadtest_user_ids.txt ../../tests/load-k6/
-          
-          # Verify token extraction works
-          echo "Verifying token extraction..."
-          TOKEN=$(head -2 performance-testing/k6-scripts/loadtest_tokens.json | tail -1 | tr -d '",')
-          echo "Token length: ${#TOKEN}"
-          echo "Token starts with: ${TOKEN:0:20}..."
-
-      - name: Run k6 load tests
-        run: |
-          echo "🚀 Running comprehensive k6 load tests with authentication..."
           mkdir -p tests/load-k6
-          
-          # Create comprehensive authenticated k6 test
-          cat > tests/load-k6/authenticated-load-test.js << 'EOF'
-          import http from 'k6/http';
-          import { check, group, sleep } from 'k6';
-          import { SharedArray } from 'k6/data';
+          BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          docker run --rm \
+            -v "$PWD/tests/load-k6:/work" \
+            -e OUTPUT_PATH=/work/loadtest_tokens.json \
+            --env-file ./config/integration.env \
+            "${BACKEND_REF}" \
+            node dist/scripts/generate-perf-tokens.js
 
-          // Load test tokens generated during CI
-          const tokens = new SharedArray('testTokens', function () {
-            try {
-              return JSON.parse(open('./loadtest_tokens.json'));
-            } catch (e) {
-              console.error('Failed to load tokens:', e);
-              return [];
-            }
-          });
-
-          export const options = {
-            stages: [
-              { duration: '30s', target: 10 },  // Ramp up to 10 users
-              { duration: '60s', target: 10 },  // Stay at 10 users
-              { duration: '30s', target: 0 },   // Ramp down
-            ],
-            thresholds: {
-              'http_req_failed': ['rate<0.1'],           // Error rate < 10%
-              'http_req_duration': ['p(95)<250'],        // 95% < 250ms
-              'http_req_duration{group:::authenticated}': ['p(95)<300'], // Auth endpoints
-              'checks': ['rate>0.9'],                    // 90% of checks pass
-            },
-          };
-
-          export default function () {
-            if (tokens.length === 0) {
-              console.error('No tokens loaded, skipping authenticated tests');
-              return;
-            }
-
-            // Select token for this VU
-            const tokenIndex = (__VU - 1) % tokens.length;
-            const token = tokens[tokenIndex];
-            
-            const headers = {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            };
-
-            // Test 1: Health check (unauthenticated)
-            group('Health Check', function () {
-              const res = http.get('http://localhost:3000/api/performance/metrics');
-              check(res, {
-                'health check status 200': (r) => r.status === 200,
-              });
-            });
-
-            // Test 2: Authenticated user endpoints
-            group('Authenticated Endpoints', function () {
-              // User profile endpoint - FIXED: Changed from /api/users/profile to /api/users/me/profile
-              const profileRes = http.get('http://localhost:3000/api/users/me/profile', { headers });
-              check(profileRes, {
-                'profile status 200 or 401': (r) => r.status === 200 || r.status === 401,
-                'profile response time < 200ms': (r) => r.timings.duration < 200,
-              });
-
-              // User discovery endpoint
-              const discoveryRes = http.get('http://localhost:3000/api/users/discovery/homepage', { headers });
-              check(discoveryRes, {
-                'discovery status 200 or 401': (r) => r.status === 200 || r.status === 401,
-                'discovery response time < 300ms': (r) => r.timings.duration < 300,
-              });
-            });
-
-            // Test 3: Events endpoint - FIXED: Changed from /api/plans to /api/events/trending (existing endpoint)
-            group('Events Endpoints', function () {
-              const eventsRes = http.get('http://localhost:3000/api/events/trending', { headers });
-              check(eventsRes, {
-                'events status 200 or 401': (r) => r.status === 200 || r.status === 401,
-                'events response time < 250ms': (r) => r.timings.duration < 250,
-              });
-            });
-
-            sleep(1);
-          }
-          EOF
-          
-          # Install k6
-          sudo gpg -k
-          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update
-          sudo apt-get install k6
-          
-          # Run the comprehensive load test
-          cd tests/load-k6
-          k6 run authenticated-load-test.js --out json=../../k6-results.json
-          
-          # Parse and analyze k6 results
-          echo "📊 Analyzing k6 performance results..."
-          node ../../scripts/parse-k6-results.js ../../k6-results.json ../../k6-summary.json
-          
-          # Display summary in CI logs
-          if [ -f "../../k6-summary.json" ]; then
-            echo "📈 K6 Performance Summary:"
-            cat ../../k6-summary.json | jq -r '.performance.responseTime | "Response Time - Avg: \(.avg)ms, P95: \(.p95)ms, P99: \(.p99)ms"'
-            cat ../../k6-summary.json | jq -r '.performance.errorRate | "Error Rate: \((.rate * 100) | tostring + "%")"'
-            cat ../../k6-summary.json | jq -r '.checks | "Check Pass Rate: \((.rate * 100) | tostring + "%")"'
-            
-            # Check for threshold failures and send notifications
-            ERROR_COUNT=$(cat ../../k6-summary.json | jq '.errors | length')
-            if [ "$ERROR_COUNT" -gt 0 ]; then
-              echo "❌ K6 performance thresholds failed:"
-              cat ../../k6-summary.json | jq -r '.errors[] | "- \(.message)"'
-              
-              # Send failure notifications
-              echo "🔔 Sending failure notifications..."
-              node ../../scripts/notify-test-failure.js ../../k6-summary.json
-              exit 1
-            else
-              echo "✅ All k6 performance thresholds passed!"
-              
-              # Send success notification
-              echo "🔔 Sending success notification..."
-              node ../../scripts/notify-test-failure.js ../../k6-summary.json
-            fi
-          else
-            echo "❌ K6 summary file not found"
-            exit 1
-          fi
-          echo "✅ Comprehensive load tests completed"
-
-      - name: Export logs & results
-        if: always()
+      - name: Seed test users (in backend container)
         run: |
-          mkdir -p logs
-          docker cp nightbff_backend_integration:/tmp/backend.log logs/backend-crash-log.txt || echo "No crash log found."
-          docker compose logs --no-color > logs/compose-logs.txt
-          docker compose logs backend > logs/backend-logs.txt
-          docker compose logs frontend > logs/frontend-logs.txt
-          docker compose logs db > logs/db-logs.txt
+          BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          docker run --rm \
+            --env-file ./config/integration.env \
+            "${BACKEND_REF}" \
+            node dist/scripts/seed-test-users.js
 
-      - name: Cleanup Docker state
-        if: always()
-        run: |
-          echo "🧹 Tearing down integration stack & pruning Docker resources..."
-          docker compose down -v || true
-          docker system prune -af || true
+      - name: Run k6 load test
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: tests/load-k6/integration-smoke.js
+          cloud: false
+          summary-json: tests/load-k6/k6-summary.json
+          quiet: false
 
-      - name: Upload logs & results
+      - name: Run Cypress smoke tests
+        uses: cypress-io/github-action@v6.10.3
+        with:
+          install: false
+          wait-on: 'http://localhost:8081'
+          wait-on-timeout: 120
+          browser: chrome
+          headless: true
+        env:
+          CYPRESS_baseUrl: http://localhost:8081
+
+      - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: integration-test-artifacts
+          name: test-results-${{ github.run_id }}
           path: |
-            logs/
-            cypress-results.json
-            k6-results.json
-            
-  publish_reports:
-    name: 'Publish Test Reports'
-    runs-on: ubuntu-latest
-    needs: [integration_tests]
-    if: always()
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: integration-test-artifacts
-          path: artifacts
+            tests/load-k6/k6-summary.json
+            tests/load-k6/loadtest_tokens.json
+            cypress/screenshots
+            cypress/videos
 
-      - name: Generate summary report
+      - name: Collect failure diagnostics
+        if: failure()
         run: |
-          echo "# 🧪 NightBFF Integration Test Results" > test-summary.md
-          echo "" >> test-summary.md
-          echo "**Commit:** ${{ github.sha }}" >> test-summary.md
-          echo "**Branch:** ${{ github.ref_name }}" >> test-summary.md
-          echo "**Workflow:** ${{ github.run_id }}" >> test-summary.md
-          echo "" >> test-summary.md
-          
-          if [ -f "artifacts/backend-coverage/clover.xml" ]; then
-            echo "✅ Backend unit tests passed with coverage" >> test-summary.md
-          fi
-          
-          if [ -f "artifacts/frontend-coverage/clover.xml" ]; then
-            echo "✅ Frontend unit tests passed with coverage" >> test-summary.md
-          fi
+          mkdir -p diagnostics
+          echo "=== Docker containers ===" > diagnostics/containers.txt
+          docker ps -a >> diagnostics/containers.txt || true
+          echo "=== Docker compose logs ===" > diagnostics/logs.txt
+          docker compose logs --tail=200 >> diagnostics/logs.txt || true
+          echo "=== Backend health check ===" > diagnostics/health-checks.txt
+          curl -v http://localhost:3000/health >> diagnostics/health-checks.txt 2>&1 || true
+          echo "" >> diagnostics/health-checks.txt
+          echo "=== Frontend health check ===" >> diagnostics/health-checks.txt
+          curl -v http://localhost:8081 >> diagnostics/health-checks.txt 2>&1 || true
+          echo "" >> diagnostics/health-checks.txt
+          echo "=== API docs check ===" >> diagnostics/health-checks.txt
+          curl -v http://localhost:3000/api/docs >> diagnostics/health-checks.txt 2>&1 || true
 
-          if [ -f "artifacts/cypress-results.json" ]; then
-            echo "✅ Cypress E2E tests completed" >> test-summary.md
-          fi
-
-          if [ -f "artifacts/k6-results.json" ]; then
-            echo "✅ k6 load tests completed" >> test-summary.md
-          fi
-          
-      - name: Upload summary
+      - name: Upload failure diagnostics
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-summary
-          path: test-summary.md
+          name: diagnostics-${{ github.run_id }}
+          path: diagnostics/
 
-  notify_completion:
-    name: 'Notify Completion'
-    runs-on: ubuntu-latest
-    needs: [publish_reports]
-    if: always()
-    steps:
-      - name: Determine status
-        id: status
-        run: |
-          if [[ "${{ needs.publish_reports.result }}" == "success" ]]; then
-            echo "status=✅ SUCCESS" >> $GITHUB_OUTPUT
-            echo "color=good" >> $GITHUB_OUTPUT
-          else
-            echo "status=❌ FAILED" >> $GITHUB_OUTPUT
-            echo "color=danger" >> $GITHUB_OUTPUT
-          fi
+      - name: Teardown
+        if: always()
+        env:
+          COMPOSE_PROJECT_NAME: nightbff_int_${{ github.run_id }}
+        run: docker compose down -v || true
 
-      - name: Log completion
-        run: |
-          echo "🎉 Integration CI pipeline completed"
-          echo "Status: ${{ steps.status.outputs.status }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}" 
+

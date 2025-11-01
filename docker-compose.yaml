@@ -1,105 +1,13 @@
-# version: '3.8'  # Removed - obsolete in Docker Compose v2
-
-# 
-# NightBFF Integration Testing Stack
-# See README.md for usage instructions.
-# This stack uses pre-built images from GHCR.
-#
-
+# NightBFF Integration Testing Stack (infra-only base)
 services:
   db:
     image: postgis/postgis:15-3.3
-    container_name: nightbff_db_integration
-    ports:
-      - "5435:5432"
-    volumes:
-      - postgres_data_integration:/var/lib/postgresql/data
-    env_file:
-      - backend/config/env/integration.env
-    networks:
-      - nightbff_net
+    ports: ["5435:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d nightbff_integration_db"]
       interval: 10s
       timeout: 5s
       retries: 5
-
   redis:
     image: redis:7-alpine
-    container_name: nightbff_redis_integration
-    ports:
-      - "6379"
-    networks:
-      - nightbff_net
-
-  migrator:
-    build:
-      context: ./backend/app
-      dockerfile: Dockerfile
-    container_name: nightbff_migrator_integration
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - nightbff_net
-    command:
-      - /bin/sh
-      - -c
-      - |
-        set -e
-        echo "✅ Migrator standing by. Waiting for DB..."
-        
-        # Use pg_isready (installed in Docker image) for the most reliable DB check
-        until pg_isready -h db -p 5432 -U admin; do
-          echo "Postgres is unavailable - sleeping"
-          sleep 2
-        done
-        
-        echo "✅ DB is ready. Applying migrations..."
-        npm run migration:run:compiled && node dist/scripts/run-seeder.js
-        
-        echo "✅ Migrations and seeding complete. Migrator finished."
-    restart: 'no'
-    env_file:
-      - backend/config/env/integration.env
-
-  backend:
-    build:
-      context: ./backend/app
-      dockerfile: Dockerfile
-    container_name: nightbff_backend_integration
-    depends_on:
-      migrator:
-        condition: service_completed_successfully
-    ports:
-      - "3000:3000"
-    env_file:
-      - backend/config/env/integration.env
-    networks:
-      - nightbff_net
-
-  frontend:
-    build:
-      context: ./nightbff-frontend
-      dockerfile: ../Dockerfile.frontend  # Path relative to context
-    container_name: nightbff_frontend_integration
-    ports:
-      - "8081:80"  # nginx serves on port 80
-    networks:
-      - nightbff_net
-    environment:
-      - EXPO_PUBLIC_API_URL=http://backend:3000
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data_integration:
-    driver: local
-
-networks:
-  nightbff_net:
-    driver: bridge
- 
+# Backend, migrator, and frontend are provided via compose.override.yml in CI using GHCR digests.

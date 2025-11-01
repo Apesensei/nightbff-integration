@@ -1,0 +1,234 @@
+diff --git a/.github/workflows/integration-ci.yml b/.github/workflows/integration-ci.yml
+index a0836a7..0902f45 100644
+--- a/.github/workflows/integration-ci.yml
++++ b/.github/workflows/integration-ci.yml
+@@ -56,26 +56,11 @@ jobs:
+           fi
+           echo "✅ No orphan submodule references found"
+ 
+-      - name: Verify workspace lockfiles match package manifests
+-        run: |
+-          set -e
+-          echo "🔍 Verifying backend lockfile consistency..."
+-          if [ -f backend/app/package-lock.json ]; then
+-            (cd backend/app && npm ci --ignore-scripts --include=optional)
+-          elif [ -f backend/app/package.json ]; then
+-            (cd backend/app && npm install --package-lock-only && npm ci --ignore-scripts --include=optional)
+-          else
+-            echo "::warning::backend/app missing package.json; skipping"
+-          fi
+-          echo "🔍 Verifying frontend lockfile consistency..."
+-          if [ -f nightbff-frontend/package-lock.json ]; then
+-            (cd nightbff-frontend && npm ci --ignore-scripts)
+-          elif [ -f nightbff-frontend/package.json ]; then
+-            (cd nightbff-frontend && npm install --package-lock-only && npm ci --ignore-scripts)
+-          else
+-            echo "::warning::nightbff-frontend missing package.json; skipping"
+-          fi
+-          echo "✅ Workspace lockfile verification passed"
++      - name: Verify lockfile matches package.json
++        run: |
++          echo "🔍 Verifying package-lock.json consistency..."
++          npm ci --ignore-scripts
++          echo "✅ Lockfile verification passed - package.json and package-lock.json are synchronized"
+ 
+   commitlint:
+     name: 'Conventional Commits Validation'
+@@ -143,10 +128,7 @@ jobs:
+         with:
+           node-version: '20'
+           cache: 'npm'
+-          cache-dependency-path: |
+-            package-lock.json
+-            backend/app/package-lock.json
+-            nightbff-frontend/package-lock.json
++          cache-dependency-path: package-lock.json
+ 
+       - name: Generate cache keys
+         id: cache-keys
+@@ -439,10 +421,10 @@ jobs:
+         run: |
+           docker buildx build \
+             --platform linux/amd64 \
+-            --file ${{ env.BACKEND_PATH }}/Dockerfile \
++            --file backend/app/Dockerfile \
+             --tag ghcr.io/apesensei/nightbff-backend:int-${{ steps.vars.outputs.backend_sha }} \
+             --push \
+-            ${{ env.BACKEND_PATH }}
++            backend
+ 
+       - name: Build & push frontend image
+         run: |
+@@ -453,11 +435,6 @@ jobs:
+             --push \
+             nightbff-frontend/
+ 
+-      - name: Update docker-compose with dynamic tags
+-        run: |
+-          sed -i "s|int-f0053e4|int-${{ steps.vars.outputs.backend_sha }}|g" docker-compose.yaml
+-          sed -i "s|int-a50f628|int-${{ steps.vars.outputs.frontend_sha }}|g" docker-compose.yaml
+-
+       - name: Install workspace dependencies
+         run: npm ci --legacy-peer-deps --include=optional
+ 
+@@ -469,29 +446,37 @@ jobs:
+           echo "✅ Migration validation passed - deployment approved"
+ 
+       - name: Start integration stack
++        env:
++          BACKEND_TAG: int-${{ steps.vars.outputs.backend_sha }}
++          FRONTEND_TAG: int-${{ steps.vars.outputs.frontend_sha }}
+         run: |
+           echo "🚀 Starting integration stack..."
+-          docker compose up -d --wait
+-          echo "✅ Stack started successfully"
++          echo "Backend image: ${{ env.BACKEND_IMAGE }}:int-${{ steps.vars.outputs.backend_sha }}"
++          echo "Frontend image: ${{ env.FRONTEND_IMAGE }}:int-${{ steps.vars.outputs.frontend_sha }}"
++          
++          # Temporarily rename override file to prevent local builds in CI
++          if [ -f docker-compose.override.yml ]; then
++            mv docker-compose.override.yml docker-compose.override.yml.disabled
++          fi
++          
++          # Start services without waiting for healthchecks
++          # Let subsequent steps handle health verification for better error visibility
++          docker compose up -d
++          
++          # Show container status for debugging
++          docker compose ps
++          
++          # Show logs from backend startup for troubleshooting
++          echo "📋 Backend startup logs:"
++          docker compose logs backend --tail=50 || true
++          
++          echo "✅ Stack started (health checks in subsequent steps)"
+ 
+       - name: Wait for backend health
+         run: |
+           echo "⏳ Waiting for backend to be healthy..."
+-          for i in {1..60}; do
+-            if curl -sf http://localhost:3000/health >/dev/null; then
+-              echo "✅ Backend is healthy"
+-              exit 0
+-            fi
+-            sleep 2
+-          done
+-          echo "❌ Backend did not become healthy in time" >&2
+-          echo "----- docker ps -----"
+-          docker ps -a || true
+-          echo "----- backend logs -----"
+-          docker compose logs backend || true
+-          echo "----- full compose logs -----"
+-          docker compose logs || true
+-          exit 1
++          timeout 120 bash -c 'until curl -f http://localhost:3000/api/performance/metrics; do sleep 2; done'
++          echo "✅ Backend is healthy"
+ 
+       - name: Wait for frontend health
+         run: |
+Submodule backend 99b854f...2949e34 (commits not present)
+diff --git a/docker-compose.override.yml b/docker-compose.override.yml
+new file mode 100644
+index 0000000..a8fa426
+--- /dev/null
++++ b/docker-compose.override.yml
+@@ -0,0 +1,36 @@
++# docker-compose.override.yml
++#
++# Local Development Overrides
++# This file is automatically used by Docker Compose when running locally.
++# It overrides the base docker-compose.yaml to build from source instead of pulling images.
++#
++# Usage:
++#   docker compose up      # Automatically uses override file (builds from source)
++#   docker compose -f docker-compose.yaml up  # Skip override (uses pre-built images)
++#
++
++services:
++  migrator:
++    build:
++      context: ./backend
++      dockerfile: app/Dockerfile
++      platforms:
++        - linux/amd64  # Force amd64 for consistency with CI
++    image: null  # Remove image reference, use build instead
++
++  backend:
++    build:
++      context: ./backend
++      dockerfile: app/Dockerfile
++      platforms:
++        - linux/amd64  # Force amd64 for consistency with CI
++    image: null  # Remove image reference, use build instead
++
++  frontend:
++    build:
++      context: ./nightbff-frontend
++      dockerfile: ../Dockerfile.frontend
++      platforms:
++        - linux/amd64  # Force amd64 for consistency with CI
++    image: null  # Remove image reference, use build instead
++
+diff --git a/docker-compose.yaml b/docker-compose.yaml
+index 1cfc45b..2e89a0f 100644
+--- a/docker-compose.yaml
++++ b/docker-compose.yaml
+@@ -3,7 +3,15 @@
+ # 
+ # NightBFF Integration Testing Stack
+ # See README.md for usage instructions.
+-# This stack uses pre-built images from GHCR.
++#
++# This stack uses pre-built images from GHCR for CI/staging/prod.
++# For local development, use docker-compose.override.yml to build from source.
++#
++# Environment variables (set in CI or use defaults):
++# - BACKEND_IMAGE: ghcr.io/apesensei/nightbff-backend (default)
++# - FRONTEND_IMAGE: ghcr.io/apesensei/nightbff-frontend (default)
++# - BACKEND_TAG: int-<commit> (CI sets this)
++# - FRONTEND_TAG: int-<commit> (CI sets this)
+ #
+ 
+ services:
+@@ -33,9 +41,7 @@ services:
+       - nightbff_net
+ 
+   migrator:
+-    build:
+-      context: ./backend/app
+-      dockerfile: Dockerfile
++    image: ${BACKEND_IMAGE:-ghcr.io/apesensei/nightbff-backend}:${BACKEND_TAG:-latest}
+     container_name: nightbff_migrator_integration
+     depends_on:
+       db:
+@@ -64,9 +70,7 @@ services:
+       - backend/config/env/integration.env
+ 
+   backend:
+-    build:
+-      context: ./backend/app
+-      dockerfile: Dockerfile
++    image: ${BACKEND_IMAGE:-ghcr.io/apesensei/nightbff-backend}:${BACKEND_TAG:-latest}
+     container_name: nightbff_backend_integration
+     depends_on:
+       migrator:
+@@ -77,11 +81,15 @@ services:
+       - backend/config/env/integration.env
+     networks:
+       - nightbff_net
++    healthcheck:
++      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/performance/metrics"]
++      interval: 10s
++      timeout: 5s
++      retries: 5
++      start_period: 30s
+ 
+   frontend:
+-    build:
+-      context: ./nightbff-frontend
+-      dockerfile: ../Dockerfile.frontend  # Path relative to context
++    image: ${FRONTEND_IMAGE:-ghcr.io/apesensei/nightbff-frontend}:${FRONTEND_TAG:-latest}
+     container_name: nightbff_frontend_integration
+     ports:
+       - "8081:80"  # nginx serves on port 80
+Submodule nightbff-frontend a50f628...d20082b (commits not present)

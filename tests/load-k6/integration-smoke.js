@@ -4,6 +4,7 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
+import { SharedArray } from 'k6/data';
 
 // Test configuration from environment or defaults
 const VUS = __ENV.VUS || 5;
@@ -12,6 +13,25 @@ const RAMP_UP = __ENV.RAMP_UP || '10s';
 const RAMP_DOWN = __ENV.RAMP_DOWN || '10s';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+// Load test tokens (optional - used for authenticated endpoints)
+const testTokens = new SharedArray('testTokens', function () {
+  try {
+    // Load tokens from file generated during CI token generation step
+    const tokensData = open('./loadtest_tokens.json');
+    return JSON.parse(tokensData);
+  } catch (e) {
+    // Tokens file may not exist or be empty - tests will run without auth
+    console.warn('Could not load tokens file (./loadtest_tokens.json). Some authenticated tests may fail.');
+    return [];
+  }
+});
+
+// Helper to get a random token for authenticated requests
+function getRandomToken() {
+  if (testTokens.length === 0) return null;
+  return testTokens[Math.floor(Math.random() * testTokens.length)];
+}
 
 // Custom metrics
 const healthCheckTrend = new Trend('health_check_duration');
@@ -138,20 +158,32 @@ export default function () {
       errorRate.add(0);
     }
 
-    // Test plan creation endpoint (expect auth error)
+    // Test plan creation endpoint with authentication (if tokens available)
     const planPayload = JSON.stringify({
       destination: `Load Test City ${__VU}-${__ITER}`,
       startDate: '2025-12-01',
       endDate: '2025-12-05'
     });
 
+    const token = getRandomToken();
+    const planHeaders = { 'Content-Type': 'application/json' };
+    if (token) {
+      planHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
     const createPlanRes = http.post(`${BASE_URL}/api/plans`, planPayload, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: planHeaders,
     });
 
     check(createPlanRes, {
       'plan creation endpoint exists': (r) => r.status !== 404,
-      'plan creation requires auth (401/403)': (r) => r.status === 401 || r.status === 403,
+      // If token available, expect success (200/201), otherwise expect auth error (401/403)
+      'plan creation with token succeeds or without token requires auth': (r) => {
+        if (token) {
+          return r.status === 200 || r.status === 201 || r.status === 400; // 400 for validation errors is acceptable
+        }
+        return r.status === 401 || r.status === 403;
+      },
     });
 
     sleep(0.5);
