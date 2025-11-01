@@ -1,6 +1,24 @@
 name: NightBFF Integration CI (Digest)
 
 on:
+  workflow_call:
+    inputs:
+      backend_digest:
+        description: "Backend image digest (sha256:...)"
+        required: true
+        type: string
+      frontend_digest:
+        description: "Frontend image digest (sha256:...)"
+        required: true
+        type: string
+      backend_tag:
+        description: "Backend image tag (fallback, e.g., int-abc1234)"
+        required: false
+        type: string
+      frontend_tag:
+        description: "Frontend image tag (fallback, e.g., int-def5678)"
+        required: false
+        type: string
   workflow_dispatch:
     inputs:
       backend_digest:
@@ -10,6 +28,14 @@ on:
       frontend_digest:
         description: "Frontend image digest (sha256:...)"
         required: true
+        type: string
+      backend_tag:
+        description: "Backend image tag (fallback, e.g., int-abc1234)"
+        required: false
+        type: string
+      frontend_tag:
+        description: "Frontend image tag (fallback, e.g., int-def5678)"
+        required: false
         type: string
 
 permissions:
@@ -30,12 +56,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image refs (digest preferred, tag fallback)
+        id: refs
+        run: |
+          BACKEND=ghcr.io/apesensei/nightbff-backend
+          FRONTEND=ghcr.io/apesensei/nightbff-frontend-web
+          if [ -n "${{ inputs.backend_digest }}" ]; then
+            echo "backend_ref=${BACKEND}@${{ inputs.backend_digest }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.backend_tag }}" ]; then
+            echo "backend_ref=${BACKEND}:${{ inputs.backend_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::backend_digest or backend_tag is required"; exit 1;
+          fi
+          if [ -n "${{ inputs.frontend_digest }}" ]; then
+            echo "frontend_ref=${FRONTEND}@${{ inputs.frontend_digest }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.frontend_tag }}" ]; then
+            echo "frontend_ref=${FRONTEND}:${{ inputs.frontend_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "::error::frontend_digest or frontend_tag is required"; exit 1;
+          fi
+
+      - name: Validate env contract (env:lint in backend container)
+        run: |
+          BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          docker run --rm --env-file ./config/integration.env "${BACKEND_REF}" npm run env:lint
+
       - name: Generate compose.override.yml
         run: |
           cat > compose.override.yml <<'EOC'
           services:
             migrator:
-              image: ghcr.io/apesensei/nightbff-backend@${{ inputs.backend_digest }}
+              image: ${{ steps.refs.outputs.backend_ref }}
               depends_on:
                 db:
                   condition: service_healthy
@@ -44,19 +95,27 @@ jobs:
               command: ["sh", "-lc", "npm run migration:run:compiled && node dist/scripts/run-seeder.js"]
               restart: "no"
             backend:
-              image: ghcr.io/apesensei/nightbff-backend@${{ inputs.backend_digest }}
+              image: ${{ steps.refs.outputs.backend_ref }}
               env_file: [ ./config/integration.env ]
               ports: [ "3000:3000" ]
+              healthcheck:
+                test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => { r.on('data', () => {}); r.on('end', () => { process.exit(r.statusCode === 200 ? 0 : 1); }); }).on('error', () => process.exit(1));"]
+                interval: 10s
+                timeout: 5s
+                retries: 12
+                start_period: 30s
               depends_on:
                 migrator:
                   condition: service_completed_successfully
             frontend:
-              image: ghcr.io/apesensei/nightbff-frontend@${{ inputs.frontend_digest }}
+              image: ${{ steps.refs.outputs.frontend_ref }}
               ports: [ "8081:80" ]
           EOC
 
       - name: Start infra and services
-        run: docker compose up -d --Wait
+        env:
+          COMPOSE_PROJECT_NAME: nightbff_int_${{ github.run_id }}
+        run: docker compose up -d --wait
 
       - name: Wait for backend health
         run: timeout 120 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
@@ -69,8 +128,83 @@ jobs:
           curl -f http://localhost:3000/api/performance/metrics
           curl -f http://localhost:3000/api/docs
 
+      - name: Generate loadtest tokens (in backend container)
+        run: |
+          mkdir -p tests/load-k6
+          BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          docker run --rm \
+            -v "$PWD/tests/load-k6:/work" \
+            -e OUTPUT_PATH=/work/loadtest_tokens.json \
+            --env-file ./config/integration.env \
+            "${BACKEND_REF}" \
+            node dist/scripts/generate-perf-tokens.js
+
+      - name: Seed test users (in backend container)
+        run: |
+          BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          docker run --rm \
+            --env-file ./config/integration.env \
+            "${BACKEND_REF}" \
+            node dist/scripts/seed-test-users.js
+
+      - name: Run k6 load test
+        uses: grafana/k6-action@v0.3.0
+        with:
+          filename: tests/load-k6/integration-smoke.js
+          cloud: false
+          summary-json: tests/load-k6/k6-summary.json
+          quiet: false
+
+      - name: Run Cypress smoke tests
+        uses: cypress-io/github-action@v6.10.3
+        with:
+          install: false
+          wait-on: 'http://localhost:8081'
+          wait-on-timeout: 120
+          browser: chrome
+          headless: true
+        env:
+          CYPRESS_baseUrl: http://localhost:8081
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_id }}
+          path: |
+            tests/load-k6/k6-summary.json
+            tests/load-k6/loadtest_tokens.json
+            cypress/screenshots
+            cypress/videos
+
+      - name: Collect failure diagnostics
+        if: failure()
+        run: |
+          mkdir -p diagnostics
+          echo "=== Docker containers ===" > diagnostics/containers.txt
+          docker ps -a >> diagnostics/containers.txt || true
+          echo "=== Docker compose logs ===" > diagnostics/logs.txt
+          docker compose logs --tail=200 >> diagnostics/logs.txt || true
+          echo "=== Backend health check ===" > diagnostics/health-checks.txt
+          curl -v http://localhost:3000/health >> diagnostics/health-checks.txt 2>&1 || true
+          echo "" >> diagnostics/health-checks.txt
+          echo "=== Frontend health check ===" >> diagnostics/health-checks.txt
+          curl -v http://localhost:8081 >> diagnostics/health-checks.txt 2>&1 || true
+          echo "" >> diagnostics/health-checks.txt
+          echo "=== API docs check ===" >> diagnostics/health-checks.txt
+          curl -v http://localhost:3000/api/docs >> diagnostics/health-checks.txt 2>&1 || true
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ github.run_id }}
+          path: diagnostics/
+
       - name: Teardown
         if: always()
+        env:
+          COMPOSE_PROJECT_NAME: nightbff_int_${{ github.run_id }}
         run: docker compose down -v || true
 
 
