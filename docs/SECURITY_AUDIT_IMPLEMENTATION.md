@@ -40,6 +40,7 @@ This document provides comprehensive documentation for the security audit implem
 - **CI/CD Security**: Automated security checks
 - **Code Quality**: Linting, testing, type checking
 - **Container Security**: Docker image scanning (existing)
+- **Image Supply Chain**: Backend and frontend images signed (cosign) and include SBOM (syft) - see producer repos
 
 ### ⚠️ What's Not Yet Secured
 

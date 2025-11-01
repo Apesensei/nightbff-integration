@@ -15,7 +15,8 @@ This document provides a centralized index of all documentation in the NightBFF 
 
 - [Branch Protection Setup](./BRANCH_PROTECTION_SETUP.md) - GitHub branch protection configuration
 - [Renovate Setup](./RENOVATE_SETUP.md) - Automated dependency update configuration
-- [Security Audit Implementation](./SECURITY_AUDIT_IMPLEMENTATION.md) - **NEW** - Security audit CI integration
+- [Security Audit Implementation](./SECURITY_AUDIT_IMPLEMENTATION.md) - Security audit CI integration
+- [ADR-001: Digest-Driven Integration](./adr/ADR-001-digest-integration.md) - Integration by digest, no submodules
 
 ### Technical Debt & Fixes
 
@@ -65,9 +66,15 @@ npm audit fix          # Fix vulnerabilities
 ### Important Files
 
 - CI Configuration: `.github/workflows/integration-ci.yml`
+- Orchestrator: `.github/workflows/orchestrate-publish-and-integration.yml`
 - Security Audit: `docs/SECURITY_AUDIT_IMPLEMENTATION.md`
-- Environment Setup: `backend/config/env/`
-- Database Migrations: `backend/src/database/`
+- Environment: `config/integration.env`
+- ADRs: `docs/adr/` (integration digest architecture)
+
+### Image References
+- Backend: `ghcr.io/apesensei/nightbff-backend` (digest-based)
+- Frontend: `ghcr.io/apesensei/nightbff-frontend-web` (digest-based)
+- Producer ADRs: See backend/frontend repos (`docs/adr/`)
 
 ---
 
