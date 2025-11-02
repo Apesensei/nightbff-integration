@@ -13,10 +13,18 @@ permissions:
 jobs:
   backend_publish:
     uses: Apesensei/nightbff-backend/.github/workflows/build-publish-backend.yml@main
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     secrets: inherit
 
   frontend_publish:
     uses: Apesensei/nightbff-frontend/.github/workflows/build-publish-frontend.yml@master
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     secrets: inherit
 
   integration_tests:
