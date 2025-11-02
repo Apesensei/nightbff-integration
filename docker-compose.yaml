@@ -3,8 +3,10 @@ services:
   db:
     image: postgis/postgis:15-3.3
     ports: ["5435:5432"]
+    env_file:
+      - ./config/integration.env
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d nightbff_integration_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
