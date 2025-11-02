@@ -110,6 +110,9 @@ jobs:
             frontend:
               image: ${{ steps.refs.outputs.frontend_ref }}
               ports: [ "8081:80" ]
+              depends_on:
+                backend:
+                  condition: service_healthy
           EOC
 
       - name: Start infra and services
