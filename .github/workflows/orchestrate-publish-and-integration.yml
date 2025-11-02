@@ -15,7 +15,7 @@ jobs:
     secrets: inherit
 
   frontend_publish:
-    uses: Apesensei/nightbff-frontend/.github/workflows/build-publish-frontend.yml@main
+    uses: Apesensei/nightbff-frontend/.github/workflows/build-publish-frontend.yml@master
     secrets: inherit
 
   integration_tests:
