@@ -184,10 +184,26 @@ jobs:
         if: failure()
         run: |
           mkdir -p diagnostics
-          echo "=== Docker containers ===" > diagnostics/containers.txt
+          echo "=== Docker ps -a ===" > diagnostics/containers.txt
           docker ps -a >> diagnostics/containers.txt || true
-          echo "=== Docker compose logs ===" > diagnostics/logs.txt
-          docker compose logs --tail=200 >> diagnostics/logs.txt || true
+          echo "=== Docker compose ps -a ===" > diagnostics/compose-ps.txt
+          docker compose ps -a >> diagnostics/compose-ps.txt || true
+
+          # Per-service logs (compose)
+          for svc in db redis migrator backend frontend; do
+            echo "=== Logs for $svc (compose) ===" > "diagnostics/${svc}.compose.log" || true
+            docker compose logs "$svc" --tail=500 >> "diagnostics/${svc}.compose.log" 2>&1 || true
+          done
+
+          # Raw container logs and state for backend and migrator
+          for svc in backend migrator; do
+            CID=$(docker compose ps -a -q "$svc" || true)
+            if [ -n "$CID" ]; then
+              docker logs "$CID" --tail=500 > "diagnostics/${svc}.docker.log" 2>&1 || true
+              docker inspect -f '{{json .State}}' "$CID" > "diagnostics/${svc}.state.json" 2>/dev/null || true
+            fi
+          done
+
           echo "=== Backend health check ===" > diagnostics/health-checks.txt
           curl -v http://localhost:3000/health >> diagnostics/health-checks.txt 2>&1 || true
           echo "" >> diagnostics/health-checks.txt
