@@ -138,21 +138,84 @@ jobs:
           curl -f http://localhost:3000/api/docs
 
       - name: Generate loadtest tokens (in backend container)
+        env:
+          COMPOSE_PROJECT_NAME: nightbff_int_${{ github.run_id }}
         run: |
           mkdir -p tests/load-k6
           BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          
+          # Load POSTGRES_* variables from env file
+          set -a
+          source ./config/integration.env
+          set +a
+          
+          # Discover the compose network name dynamically
+          # Docker Compose v2 creates networks as: {project_name}_default
+          # Filter for networks matching our project name (handles underscores in project name)
+          COMPOSE_NETWORK=$(docker network ls --filter "name=${COMPOSE_PROJECT_NAME}_default" --format "{{.Name}}" | head -1)
+          # Fallback: try pattern matching if exact match fails
+          if [ -z "$COMPOSE_NETWORK" ]; then
+            COMPOSE_NETWORK=$(docker network ls --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Name}}" | grep -E "${COMPOSE_PROJECT_NAME}" | head -1)
+          fi
+          if [ -z "$COMPOSE_NETWORK" ]; then
+            echo "❌ Error: Could not find compose network for project '${COMPOSE_PROJECT_NAME}'"
+            echo "Available networks:"
+            docker network ls
+            exit 1
+          fi
+          echo "✅ Using compose network: $COMPOSE_NETWORK"
+          
+          # Construct DATABASE_URL using service name 'db' (works within compose network)
+          # Service name 'db' resolves to the db container on port 5432 (internal port)
+          export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+          echo "✅ Constructed DATABASE_URL (using service name 'db:5432')"
+          
           docker run --rm \
+            --network "$COMPOSE_NETWORK" \
             -v "$PWD/tests/load-k6:/work" \
             -e OUTPUT_PATH=/work/loadtest_tokens.json \
-            --env-file ./config/integration.env \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e JWT_SECRET="$JWT_SECRET" \
+            -e NODE_ENV="$NODE_ENV" \
             "${BACKEND_REF}" \
             node dist/scripts/generate-perf-tokens.js
 
       - name: Seed test users (in backend container)
+        env:
+          COMPOSE_PROJECT_NAME: nightbff_int_${{ github.run_id }}
         run: |
           BACKEND_REF="${{ steps.refs.outputs.backend_ref }}"
+          
+          # Load POSTGRES_* variables from env file
+          set -a
+          source ./config/integration.env
+          set +a
+          
+          # Discover the compose network name dynamically
+          # Docker Compose v2 creates networks as: {project_name}_default
+          # Filter for networks matching our project name (handles underscores in project name)
+          COMPOSE_NETWORK=$(docker network ls --filter "name=${COMPOSE_PROJECT_NAME}_default" --format "{{.Name}}" | head -1)
+          # Fallback: try pattern matching if exact match fails
+          if [ -z "$COMPOSE_NETWORK" ]; then
+            COMPOSE_NETWORK=$(docker network ls --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Name}}" | grep -E "${COMPOSE_PROJECT_NAME}" | head -1)
+          fi
+          if [ -z "$COMPOSE_NETWORK" ]; then
+            echo "❌ Error: Could not find compose network for project '${COMPOSE_PROJECT_NAME}'"
+            echo "Available networks:"
+            docker network ls
+            exit 1
+          fi
+          echo "✅ Using compose network: $COMPOSE_NETWORK"
+          
+          # Construct DATABASE_URL using service name 'db' (works within compose network)
+          export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+          echo "✅ Constructed DATABASE_URL (using service name 'db:5432')"
+          
           docker run --rm \
-            --env-file ./config/integration.env \
+            --network "$COMPOSE_NETWORK" \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e JWT_SECRET="$JWT_SECRET" \
+            -e NODE_ENV="$NODE_ENV" \
             "${BACKEND_REF}" \
             node dist/scripts/seed-test-users.js
 
